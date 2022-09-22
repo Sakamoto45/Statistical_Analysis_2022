@@ -2,6 +2,7 @@
 
 Statistical_Analysis_2022  
 ├<task_name_1>  
+│ ├<database_1.xml>  
 │ ├<student_name_1>  
 │ │ ├<file_name.rmd>  
 │ │ └<file_name.html>  
@@ -11,6 +12,7 @@ Statistical_Analysis_2022
 │ ⋮  
 │ └<student_name_k>  
 ├<task_name_2>  
+│ ├<database_2.xml>  
 │ ├<student_name_1>  
 │ │ ├<file_name.rmd>  
 │ ⋮ └<file_name.html>  
