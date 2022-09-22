@@ -1,0 +1,125 @@
+---
+title: "Task1"
+output: html_notebook
+---
+
+```{r}
+library("readxl")
+data <- read_excel("MY101.xls")
+description <- read_excel("iqrate_description.xlsx")
+```
+
+```{r}
+summary(data)[,1:101]
+```
+```{r}
+summary(data)[,102:202]
+```
+Зная, что разным людям свойственно либо давать заниженные, либо завышенные оценки, нормализуем оценки фильмов по каждому индивиду. В качестве метода нормализации выберем минимаксную нормализацию x_i=(x_i-min(x))/(max(x) - min(x))*12.
+https://wiki.loginom.ru/articles/data-normalization.html
+```{r}
+data$max <- apply(data[,1:101], 1, max, na.rm=TRUE)
+data$min <- apply(data[,1:101], 1, min, na.rm=TRUE)
+
+data[,1:101] <- apply(data[,1:101], 2, function(x) {(x - data$min) / (data$max - data$min) * 12})
+```
+Сконцентрируем внимание на том, как психотип личности влияет на предпочтение в фильмах. Обратим внимание на корреляции, связанные с тестами Кейриси, так как эти признаки имеют наименьшее число пропусков из подобных им.
+```{r}
+summary(data)[,104:107]
+```
+Предположение. "Скписок шиндлера" больше нравится интровертным личностям, так как это драма. 
+```{r}
+library(dplyr)
+library(ggplot2)
+
+datanew <- data %>% filter(!is.na(E_I__КЕЙ), !is.na(СПИСОК_Ш))
+points <- data.frame(xyTable(datanew$E_I__КЕЙ, datanew$СПИСОК_Ш))
+colnames(points)[3] <- "size"
+points$x <- factor(points$x)
+count <- data.frame(table(points$x))
+colnames(count)[1] <- "x"
+colnames(count)[2] <- "number"
+
+
+points <- inner_join(points, count, by = "x")
+ggplot(points, aes(x = x, y = y)) + 
+  geom_point(aes(size = size), alpha = 0.5) +
+  xlab("Степень интровертности пользователя") + 
+  ylab("Оценка Списка Шиндлера")
+
+points$size <- points$size / points$number
+
+# Тут вопрос.
+ggplot(points, aes(x = x, y = y)) + 
+  geom_point(aes(size = size), alpha = 0.5) +
+  xlab("Степень интровертности пользователя") + 
+  ylab("Оценка Списка Шиндлера")
+```
+Корреляций не видно. Это наталкивает на мысль проверить, есть ли вообще корреляции между тестами и фильмами. *О существовании следующего графика я узнал от Егора.*
+```{r}
+library(reshape)
+
+#correlation <- melt(cor(data, method="spearman", use="pairwise.complete.obs"))
+
+ggplot(correlation, aes(X1, X2, fill= value)) + 
+  geom_tile() +
+  scale_fill_gradient(low="yellow", high="blue") +
+  theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(), 
+        axis.text.y=element_blank(), axis.ticks.y=element_blank())
+```
+Можно заметить, что корреляций между тестами и оценками фильмов нет. Значит нужно иссследовать корреляции между фильмами. Поэтому рекомендательные системы основаны в основном на данных оценках фильмов. Но о корреляциях между фильмами, скорее всего, кто-то расскажет. Посмотрим на имеющиеся корреляции между тестами.
+
+```{r}
+library(reshape)
+
+correlation.new <- melt(cor(data[124:137], method="spearman", use="pairwise.complete.obs"))
+
+ggplot(correlation.new, aes(X1, X2, fill= value)) + 
+  geom_tile() +
+  scale_fill_gradient(low="white", high="black") +
+  theme(axis.text.x = element_text(angle=90)) +
+  theme(axis.title.x=element_blank(), axis.title.y=element_blank())
+```
+```{r}
+summary(data)[,124:137]
+```
+```{r}
+library(GGally)
+# Видимо нельзя выбрать метод подсчета корреляции.
+ggpairs(select(data, IQ, МАТЕМАТ1, МАТЕМАТ2), 
+        diag = list(continuous = "barDiag"),
+        columnLabels = c("IQ","Мат. споc. (пр. м.)","Мат. споc. (т. м.)"))
+```
+В целях выполнения плана по количеству графиков, рассмотрим связь практических и теоретических знаний математики получше.
+```{r}
+library(ggExtra)
+p <- ggplot(select(data, МАТЕМАТ1, МАТЕМАТ2), aes(x=МАТЕМАТ1, y=МАТЕМАТ2)) +
+    geom_point() +
+    geom_smooth(method=loess , color="black", se=TRUE) +
+    xlab("Математические способности (пр. мышление)") +
+    ylab("Математические способности (теор. мышление)")
+ggMarginal(p, type="boxplot")
+```
+Предположение. Сущетсвует не одна мода в знаниях математики.
+```{r}
+library(hexbin)
+ggplot(select(data, МАТЕМАТ1, МАТЕМАТ2), aes(x=МАТЕМАТ1, y=МАТЕМАТ2)) +
+    stat_density_2d(aes(fill = ..level..), geom = "polygon") +
+    xlab("Математические способности (пр. мышление)") +
+    ylab("Математические способности (теор. мышление)") +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0))
+ggplot(select(data, МАТЕМАТ1, МАТЕМАТ2), aes(x=МАТЕМАТ1, y=МАТЕМАТ2)) +
+    stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
+    xlab("Математические способности (пр. мышление)") +
+    ylab("Математические способности (теор.мышление)") +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0))
+ 
+```
+
+
+
+
+
+
