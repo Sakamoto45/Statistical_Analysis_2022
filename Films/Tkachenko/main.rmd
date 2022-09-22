@@ -25,12 +25,12 @@ library(tidyr)
 
 
 # data <- read_excel("StatAnal/Task_1/MY101.xls")
-data <- read_excel("MY101.xls")
+data <- read_excel("../MY101.xls")
 
 names(data) <- 1:202
 
 # names <- read_excel("StatAnal/Task_1/iqrate_description.xlsx", col_names = FALSE)
-names <- read_excel("iqrate_description.xlsx", col_names = FALSE)
+names <- read_excel("../iqrate_description.xlsx", col_names = FALSE)
 
 names <- sapply(sapply(strsplit(str_squish(names$...2), split = " "),
     function(x) x[2:length(x)]), paste, collapse = " ")
