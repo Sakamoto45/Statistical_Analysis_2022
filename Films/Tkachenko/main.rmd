@@ -1,0 +1,310 @@
+---
+title: "Task_1"
+output:
+    html_document:
+        df_print: paged
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.width = 8, fig.height = 8)
+library(readxl)
+library(reshape2)
+library(ggplot2)
+library(GGally)
+library(stringr) #str_squish
+library(dplyr)
+library(correlation) #cor_sort
+library(forcats)
+library(tidyr)
+# library(rlist)
+# library(abind)
+```
+
+Ввод данных
+```{r}
+
+
+# data <- read_excel("StatAnal/Task_1/MY101.xls")
+data <- read_excel("MY101.xls")
+
+names(data) <- 1:202
+
+# names <- read_excel("StatAnal/Task_1/iqrate_description.xlsx", col_names = FALSE)
+names <- read_excel("iqrate_description.xlsx", col_names = FALSE)
+
+names <- sapply(sapply(strsplit(str_squish(names$...2), split = " "),
+    function(x) x[2:length(x)]), paste, collapse = " ")
+
+films <- 1:101
+tests <- 102:202
+
+
+```
+
+<!-- Вывод пар с большой корреляцией -->
+```{r}
+
+# names(data)
+
+# cor_matrix <- cor(data, method = "pearson", use = "pairwise.complete.obs")
+# for (i in 1:(length(names) - 1))
+#     for (j in (i + 1):length(names))
+#         if (is.na(cor_matrix[i, j]) || abs(cor_matrix[i, j]) > 0.7)
+#             print(paste(cor_matrix[i, j], ":", i, names[i], "&", j, names[j]))
+
+
+```
+
+Матрица корреляций без обработки
+```{r}
+ggplot(melt(cor(data, method = "pearson", use = "pairwise.complete.obs"))) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark()
+```
+
+Стандартизация оценки фильмов по людям 
+```{r}
+data_ <- data %>%
+    rowwise() %>%
+    mutate(
+    film_rating_max = max(c_across(all_of(films)), na.rm = TRUE),
+    film_rating_min = min(c_across(all_of(films)), na.rm = TRUE)) %>%
+    ungroup()
+data_[films] <- (data_[, films] - data_$film_rating_min) / (data_$film_rating_max - data_$film_rating_min)
+data_$film_rating_max <- NULL
+data_$film_rating_min <- NULL
+cor_matrix <- cor(data_, method = "pearson", use = "pairwise.complete.obs")
+```
+
+Матрица корреляций после стандартизации оценки фильмов по людям 
+```{r}
+ggplot(melt(cor_matrix)) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark()
+```
+
+Пропала корреляция оценок фильмов и тестов на юмор
+Проверю есть ли связь в средней оценке которую индивид ставит фильму и результатом тестов на юмор
+
+```{r}
+
+data_humor <- data %>%
+    rowwise() %>%
+    mutate(
+    film_rating_avr = mean(c_across(all_of(films)), na.rm = TRUE)) %>%
+    ungroup()
+
+my_bin <- function(data, mapping, ..., low = "#00ff00", high = "#ff0000") {
+  ggplot(data = data, mapping = mapping) +
+    geom_bin2d(...) +
+    scale_fill_gradient(low = low, high = high)
+}
+
+ggpairs(data_humor,
+    columns = c("188", "189", "film_rating_avr"),
+    columnLabels = c("Анекдоты", "ТЮФ", "Средняя оценка фильмов"),
+    lower = list(
+        # continuous = wrap(my_bin, binwidth = c(0.2, 0.2))
+        continuous = wrap(ggally_smooth_lm,
+            alpha = 0.1,
+            line_color = "blue",
+            line_size = 3
+        )
+    )
+)
+```
+
+
+
+Асимметрия полушарий и правши
+
+```{r}
+# tmp <- c(144, 193:197)
+
+# ggplot(melt(cor_matrix[tmp, tmp])) +
+#     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+#     scale_fill_gradient2() +
+#     theme_dark()
+
+# # data_asymmetry <- data.frame(as.factor(data[[as.character(tmp)]]))
+
+# data_tmp <- data.frame(
+#     data[[144]],
+#     data[[193]],
+#     data[[194]],
+#     data[[195]],
+#     data[[196]],
+#     data[[197]]) %>% drop_na()
+
+# data_asymmetry <- data.frame(
+#     as.factor(data_tmp[[144]]),
+#     as.factor(data_tmp[[193]]),
+#     as.factor(data_tmp[[194]]),
+#     as.factor(data_tmp[[195]]),
+#     as.factor(data_tmp[[196]]),
+#     as.factor(data_tmp[[197]])
+# )
+
+# names(data_asymmetry) <- names[tmp]
+
+# ggpairs(data_asymmetry,
+#     # columns = as.character(tmp),
+#     # columnLabels = names[tmp],
+#     # lower = list(
+#     #     continuous = ggally_smooth_lm
+#     # )
+# )
+```
+
+
+```{r}
+# hide <- function(id) {
+#     films <<- films[!which(as.integer(films) %in% id)]
+#     tests <<- tests[!which(as.integer(tests) %in% id)]
+#     cor_matrix <<- cor_matrix[!(rownames(cor_matrix) %in% id), !(colnames(cor_matrix) %in% id)]
+# }
+# hide <- c("188, 189")
+```
+
+
+```{r}
+# similar_films <- data.frame(integer(),
+#                             integer())
+
+# for (i in films)
+#     for (j in films)
+#         if (abs(cor_matrix[i, j]) > 0.5 && i < j)
+#             print(paste(cor_matrix[i, j], ":", i, names[i], "&", j, names[j]))
+```
+
+матрица сорелляций корреляций (на сколько пара тестов похоже коррелируют с остальными данными)
+
+группу сильно коррелирующих тестов можно заменить одним
+
+например группа умственных тестов 124-136, хотя 137 не коррелирует с остальными умственными тестами (память != мышление)
+
+возраст и категоризованный возраст при таком анализе эквивалентны, аналогично образование
+
+
+
+Nут можно найти группы похожих тестов (например на инелект) и оставить один из группы
+```{r}
+cor_cor_matrix <- cor(cor_matrix, method = "pearson", use = "pairwise.complete.obs")
+
+ggplot(melt(cor_cor_matrix)) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark()
+
+```
+
+
+
+<!-- отсортированная матрица корреляций часть с фильмами  -->
+```{r}
+
+# cor_matrix_sorted <- cor_sort(cor_matrix[films, films])
+
+# sorted_films <- as.integer(colnames(cor_matrix_sorted))
+# colnames(cor_matrix_sorted) <- films
+# rownames(cor_matrix_sorted) <- films
+
+# ggplot(melt(cor_matrix_sorted)) +
+#     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+#     scale_fill_gradient2() +
+#     theme_dark()
+
+# print(names[sorted_films])
+
+```
+
+
+
+Фильмы похожие на 
+
+```{r}
+compared_film <- 95
+
+similar_films <- data.frame(film_id = films,
+                            cor = cor_matrix[compared_film, films]) %>%
+    arrange(desc(cor)) %>%
+    mutate(name = names[film_id])
+
+
+# ggplot(data = similar_films) +
+#     geom_bar(aes(film_id, cor))
+
+similar_films %>%
+  mutate(name = fct_reorder(name, cor)) %>%
+  ggplot( aes(x=film_id, y=cor)) +
+    geom_bar(stat="identity", fill="#f68060", alpha=.6, width=.4) +
+    coord_flip() +
+    xlab("") +
+    theme_bw()
+
+print(similar_films[, c("cor", "name")])
+
+# print(similar_films[, c("film_id", "name")])
+```
+
+
+```{r}
+# cor_df <- data.frame(cor_matrix)
+data[[140]] <- as.factor(data[[140]])
+# data[[141]] <- as.factor(data[[141]])
+data[[142]] <- as.factor(data[[142]])
+
+ggpairs(data,
+    columns = c("139", "141"),
+    columnLabels = names[c(139, 141)],
+    lower = list(
+        # continuous = wrap(my_bin, binwidth = c(0.2, 0.2))
+        # continuous = ggally_smooth_lm
+        continuous = wrap(my_bin, binwidth = c(1, 1))
+        # wrap(ggally_smooth_lm,
+        #     alpha = 0.1,
+        #     line_color = "blue",
+        #     line_size = 3
+        # )
+    )
+)
+
+```
+
+```{r}
+ggpairs(data,
+    columns = c("139", "141"),
+    columnLabels = names[c(139, 141)],
+    lower = list(
+        # continuous = wrap(my_bin, binwidth = c(0.2, 0.2))
+        # continuous = ggally_smooth_lm
+        # continuous = wrap(my_bin, binwidth = c(1, 1))
+        # wrap(ggally_smooth_lm,
+        #     alpha = 0.1,
+        #     line_color = "blue",
+        #     line_size = 3
+        # )
+    )
+)
+```
+
+
+
+
+
+1 корреляция всего и стандартизированные оценки
+есть
+
+2 средняя оценка фильмов и тесты на юмор
+есть
+
+3 асимметрия полушарий и правши каким-нибудь отдельным графиком
+
+
+4 корреляции умственных тестов и логики
+
+5 топ похожих фильмов по оценкам
+сделать график
+ 
