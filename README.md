@@ -1,6 +1,4 @@
-# Statistical_Analysis_2022
-
-## Структура репозитория
+# Структура репозитория
 
 Statistical_Analysis_2022  
 ├─<task_name_1>  
