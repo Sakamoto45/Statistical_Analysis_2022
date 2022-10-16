@@ -7,13 +7,17 @@ output:
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(fig.width = 8, fig.height = 8)
+knitr::opts_chunk$set(
+    # This should allow Rmarkdown to locate the data
+    root.dir = rprojroot::find_rstudio_root_file()
+)
 library(readxl)
 library(reshape2)
 library(ggplot2)
 library(GGally)
-library(stringr) #str_squish
+library(stringr) # str_squish
 library(dplyr)
-library(correlation) #cor_sort
+library(correlation) # cor_sort
 library(forcats)
 library(tidyr)
 # library(rlist)
@@ -22,23 +26,20 @@ library(tidyr)
 
 Ввод данных
 ```{r}
-
-
-# data <- read_excel("StatAnal/Task_1/MY101.xls")
+# setwd("StatAnal/Statistical_Analysis_2022/Films/Tkachenko")
 data <- read_excel("../MY101.xls")
 
 names(data) <- 1:202
 
-# names <- read_excel("StatAnal/Task_1/iqrate_description.xlsx", col_names = FALSE)
 names <- read_excel("../iqrate_description.xlsx", col_names = FALSE)
 
-names <- sapply(sapply(strsplit(str_squish(names$...2), split = " "),
-    function(x) x[2:length(x)]), paste, collapse = " ")
+names <- sapply(sapply(
+    strsplit(str_squish(names$...2), split = " "),
+    function(x) x[2:length(x)]
+), paste, collapse = " ")
 
 films <- 1:101
 tests <- 102:202
-
-
 ```
 
 <!-- Вывод пар с большой корреляцией -->
@@ -51,8 +52,6 @@ tests <- 102:202
 #     for (j in (i + 1):length(names))
 #         if (is.na(cor_matrix[i, j]) || abs(cor_matrix[i, j]) > 0.7)
 #             print(paste(cor_matrix[i, j], ":", i, names[i], "&", j, names[j]))
-
-
 ```
 
 Матрица корреляций без обработки
@@ -68,8 +67,9 @@ ggplot(melt(cor(data, method = "pearson", use = "pairwise.complete.obs"))) +
 data_ <- data %>%
     rowwise() %>%
     mutate(
-    film_rating_max = max(c_across(all_of(films)), na.rm = TRUE),
-    film_rating_min = min(c_across(all_of(films)), na.rm = TRUE)) %>%
+        film_rating_max = max(c_across(all_of(films)), na.rm = TRUE),
+        film_rating_min = min(c_across(all_of(films)), na.rm = TRUE)
+    ) %>%
     ungroup()
 data_[films] <- (data_[, films] - data_$film_rating_min) / (data_$film_rating_max - data_$film_rating_min)
 data_$film_rating_max <- NULL
@@ -93,13 +93,14 @@ ggplot(melt(cor_matrix)) +
 data_humor <- data %>%
     rowwise() %>%
     mutate(
-    film_rating_avr = mean(c_across(all_of(films)), na.rm = TRUE)) %>%
+        film_rating_avr = mean(c_across(all_of(films)), na.rm = TRUE)
+    ) %>%
     ungroup()
 
 my_bin <- function(data, mapping, ..., low = "#00ff00", high = "#ff0000") {
-  ggplot(data = data, mapping = mapping) +
-    geom_bin2d(...) +
-    scale_fill_gradient(low = low, high = high)
+    ggplot(data = data, mapping = mapping) +
+        geom_bin2d(...) +
+        scale_fill_gradient(low = low, high = high)
 }
 
 ggpairs(data_humor,
@@ -197,7 +198,6 @@ ggplot(melt(cor_cor_matrix)) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
     theme_dark()
-
 ```
 
 
@@ -217,7 +217,6 @@ ggplot(melt(cor_cor_matrix)) +
 #     theme_dark()
 
 # print(names[sorted_films])
-
 ```
 
 
@@ -227,8 +226,10 @@ ggplot(melt(cor_cor_matrix)) +
 ```{r}
 compared_film <- 95
 
-similar_films <- data.frame(film_id = films,
-                            cor = cor_matrix[compared_film, films]) %>%
+similar_films <- data.frame(
+    film_id = films,
+    cor = cor_matrix[compared_film, films]
+) %>%
     arrange(desc(cor)) %>%
     mutate(name = names[film_id])
 
@@ -237,9 +238,9 @@ similar_films <- data.frame(film_id = films,
 #     geom_bar(aes(film_id, cor))
 
 similar_films %>%
-  mutate(name = fct_reorder(name, cor)) %>%
-  ggplot( aes(x=film_id, y=cor)) +
-    geom_bar(stat="identity", fill="#f68060", alpha=.6, width=.4) +
+    mutate(name = fct_reorder(name, cor)) %>%
+    ggplot(aes(x = film_id, y = cor)) +
+    geom_bar(stat = "identity", fill = "#f68060", alpha = .6, width = .4) +
     coord_flip() +
     xlab("") +
     theme_bw()
@@ -270,7 +271,6 @@ ggpairs(data,
         # )
     )
 )
-
 ```
 
 ```{r}

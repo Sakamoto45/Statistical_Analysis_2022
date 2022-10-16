@@ -1,0 +1,105 @@
+---
+title: "Partial_correlation"
+output:
+    html_document:
+        df_print: paged
+---
+
+
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.width = 8, fig.height = 8)
+
+library(readxl)
+library(reshape2)
+library(ggplot2)
+library(GGally)
+library(stringr) # str_squish
+library(dplyr)
+library(correlation) # cor_sort
+library(forcats)
+library(tidyr)
+# library(rlist)
+# library(abind)
+```
+
+
+
+
+
+
+
+
+```{r}
+# setwd("StatAnal/Statistical_Analysis_2022/Partial_Correlation_CARDATA/Tkachenko")
+
+
+# data <- read_excel("StatAnal/Task_1/MY101.xls")
+data <- read_excel("../CARDATA.xls")
+data <- data %>%
+    mutate(
+        ROW = NULL,
+        MPG = 1 / MPG,
+        CYLINDER = as.factor(CYLINDER),
+        ACCEL = 1 / ACCEL,
+        YEAR = as.factor(YEAR),
+        ORIGIN = as.factor(ORIGIN),
+        PRICE = log(PRICE)
+    ) %>%
+    rename(GMP = MPG) %>%
+    filter(CYLINDER %in% c(4, 6, 8)) %>%
+    drop_na()
+```
+
+
+```{r}
+
+pdf(file = "ggpairs.pdf")
+ggpairs(data,
+    columns = c(1:8, 11),
+    lower = list(combo = wrap("facethist", bins = 10)),
+    diag = list(continuous = wrap("barDiag", bins = 10))
+)
+dev.off()
+```
+
+
+```{r}
+
+pdf(file = "ggpairs_grouped_cylinder.pdf")
+ggpairs(data,
+    aes(colour = CYLINDER),
+    columns = c(1:8, 11),
+    upper = list(continuous = wrap("cor", digits = 2)),
+    lower = list(combo = wrap("facethist", bins = 10)),
+    diag = list(continuous = wrap("barDiag", bins = 10)),
+)
+dev.off()
+```
+
+```{r}
+
+pdf(file = "ggpairs_grouped_year.pdf")
+ggpairs(data,
+    aes(colour = YEAR),
+    columns = c(1:8, 11),
+    upper = list(continuous = wrap("cor", digits = 2)),
+    lower = list(combo = wrap("facethist", bins = 10)),
+    diag = list(continuous = wrap("barDiag", bins = 10)),
+)
+dev.off()
+```
+
+```{r}
+
+pdf(file = "ggpairs_grouped_origin.pdf")
+ggpairs(data,
+    aes(colour = ORIGIN),
+    columns = c(1:8, 11),
+    upper = list(continuous = wrap("cor", digits = 2)),
+    lower = list(combo = wrap("facethist", bins = 10)),
+    diag = list(continuous = wrap("barDiag", bins = 10)),
+)
+dev.off()
+```
+
