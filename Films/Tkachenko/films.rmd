@@ -24,7 +24,7 @@ library(tidyr)
 
 Ввод данных
 ```{r}
-# setwd("StatAnal/Statistical_Analysis_2022/Films/Tkachenko")
+setwd("R/Statistical_Analysis_2022/Films/Tkachenko")
 data <- read_excel("../MY101.xls")
 
 names(data) <- 1:202
