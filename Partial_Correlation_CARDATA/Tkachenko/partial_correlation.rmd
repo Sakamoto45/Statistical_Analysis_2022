@@ -61,19 +61,19 @@ data_factor <- data %>%
 
 ```{r}
 
-pdf(file = "ggpairs.pdf")
+# pdf(file = "ggpairs.pdf")
 ggpairs(data_factor,
     # columns = c(1:8, 11),
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10))
 )
-dev.off()
+# dev.off()
 ```
 
 
 ```{r}
 
-pdf(file = "ggpairs_grouped_cylinder.pdf")
+# pdf(file = "ggpairs_grouped_cylinder.pdf")
 ggpairs(data_factor,
     aes(colour = CYLINDER),
     # columns = c(1:8, 11),
@@ -81,12 +81,12 @@ ggpairs(data_factor,
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10)),
 )
-dev.off()
+# dev.off()
 ```
 
 ```{r}
 
-pdf(file = "ggpairs_grouped_year.pdf")
+# pdf(file = "ggpairs_grouped_year.pdf")
 ggpairs(data_factor,
     aes(colour = YEAR),
     # columns = c(1:8, 11),
@@ -94,12 +94,12 @@ ggpairs(data_factor,
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10)),
 )
-dev.off()
+# dev.off()
 ```
 
 ```{r}
 
-pdf(file = "ggpairs_grouped_origin.pdf")
+# pdf(file = "ggpairs_grouped_origin.pdf")
 ggpairs(data_factor,
     aes(colour = ORIGIN),
     # columns = c(1:8, 11),
@@ -107,12 +107,12 @@ ggpairs(data_factor,
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10)),
 )
-dev.off()
+# dev.off()
 ```
 
 
 ```{r}
-pdf(file = "cor_matrix_pearson.pdf")
+# pdf(file = "cor_matrix_pearson.pdf")
 ggplot(melt(cor(data, method = "pearson"))) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
@@ -120,32 +120,32 @@ ggplot(melt(cor(data, method = "pearson"))) +
 
 # print(melt(cor(data, method = "pearson")))
 # print((cor(data, method = "pearson")))
-dev.off()
+# dev.off()
 ```
 
 ```{r}
-pdf(file = "cor_matrix_spearman.pdf")
+# pdf(file = "cor_matrix_spearman.pdf")
 ggplot(melt(cor(data, method = "spearman"))) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
     theme_dark()
-dev.off()
+# dev.off()
 ```
 
 ```{r}
-pdf(file = "partial_cor_matrix_pearson.pdf")
+# pdf(file = "partial_cor_matrix_pearson.pdf")
 ggplot(melt(pcor(data, method = "pearson")$estimate)) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
     theme_dark()
-dev.off()
+# dev.off()
 ```
 
 ```{r}
-pdf(file = "partial_cor_matrix_spearman.pdf")
+# pdf(file = "partial_cor_matrix_spearman.pdf")
 ggplot(melt(pcor(data, method = "spearman")$estimate)) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
     theme_dark()
-dev.off()
+# dev.off()
 ```
