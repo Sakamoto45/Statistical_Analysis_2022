@@ -13,14 +13,17 @@ knitr::opts_chunk$set(fig.width = 8, fig.height = 8)
 library(readxl)
 library(reshape2)
 library(ggplot2)
-library(GGally)
+library(GGally) # pairwise plot
 library(stringr) # str_squish
-library(dplyr)
+
 library(correlation) # cor_sort
-library(forcats)
-library(tidyr)
+# library(forcats)
+library(tidyr) # drop.na()
+library(ppcor)
+library(dplyr) # dataframe
 # library(rlist)
 # library(abind)
+# setwd("R/Statistical_Analysis_2022/Partial_Correlation_CARDATA/Tkachenko")
 ```
 
 
@@ -31,7 +34,6 @@ library(tidyr)
 
 
 ```{r}
-# setwd("StatAnal/Statistical_Analysis_2022/Partial_Correlation_CARDATA/Tkachenko")
 
 
 # data <- read_excel("StatAnal/Task_1/MY101.xls")
@@ -40,23 +42,28 @@ data <- data %>%
     mutate(
         ROW = NULL,
         MPG = 1 / MPG,
-        CYLINDER = as.factor(CYLINDER),
         ACCEL = 1 / ACCEL,
-        YEAR = as.factor(YEAR),
-        ORIGIN = as.factor(ORIGIN),
         PRICE = log(PRICE)
     ) %>%
-    rename(GMP = MPG) %>%
+    rename(GPM = MPG) %>%
     filter(CYLINDER %in% c(4, 6, 8)) %>%
+    select(-MAKE, -MODEL) %>%
     drop_na()
+
+data_factor <- data %>%
+    mutate(
+        CYLINDER = as.factor(CYLINDER),
+        YEAR = as.factor(YEAR),
+        ORIGIN = as.factor(ORIGIN),
+    )
 ```
 
 
 ```{r}
 
 pdf(file = "ggpairs.pdf")
-ggpairs(data,
-    columns = c(1:8, 11),
+ggpairs(data_factor,
+    # columns = c(1:8, 11),
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10))
 )
@@ -67,9 +74,9 @@ dev.off()
 ```{r}
 
 pdf(file = "ggpairs_grouped_cylinder.pdf")
-ggpairs(data,
+ggpairs(data_factor,
     aes(colour = CYLINDER),
-    columns = c(1:8, 11),
+    # columns = c(1:8, 11),
     upper = list(continuous = wrap("cor", digits = 2)),
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10)),
@@ -80,9 +87,9 @@ dev.off()
 ```{r}
 
 pdf(file = "ggpairs_grouped_year.pdf")
-ggpairs(data,
+ggpairs(data_factor,
     aes(colour = YEAR),
-    columns = c(1:8, 11),
+    # columns = c(1:8, 11),
     upper = list(continuous = wrap("cor", digits = 2)),
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10)),
@@ -93,9 +100,9 @@ dev.off()
 ```{r}
 
 pdf(file = "ggpairs_grouped_origin.pdf")
-ggpairs(data,
+ggpairs(data_factor,
     aes(colour = ORIGIN),
-    columns = c(1:8, 11),
+    # columns = c(1:8, 11),
     upper = list(continuous = wrap("cor", digits = 2)),
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10)),
@@ -103,3 +110,42 @@ ggpairs(data,
 dev.off()
 ```
 
+
+```{r}
+pdf(file = "cor_matrix_pearson.pdf")
+ggplot(melt(cor(data, method = "pearson"))) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark()
+
+# print(melt(cor(data, method = "pearson")))
+# print((cor(data, method = "pearson")))
+dev.off()
+```
+
+```{r}
+pdf(file = "cor_matrix_spearman.pdf")
+ggplot(melt(cor(data, method = "spearman"))) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark()
+dev.off()
+```
+
+```{r}
+pdf(file = "partial_cor_matrix_pearson.pdf")
+ggplot(melt(pcor(data, method = "pearson")$estimate)) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark()
+dev.off()
+```
+
+```{r}
+pdf(file = "partial_cor_matrix_spearman.pdf")
+ggplot(melt(pcor(data, method = "spearman")$estimate)) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark()
+dev.off()
+```
