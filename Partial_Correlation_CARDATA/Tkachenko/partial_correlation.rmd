@@ -17,12 +17,9 @@ library(GGally) # pairwise plot
 library(stringr) # str_squish
 
 library(correlation) # cor_sort
-# library(forcats)
 library(tidyr) # drop.na()
 library(ppcor)
 library(dplyr) # dataframe
-# library(rlist)
-# library(abind)
 # setwd("R/Statistical_Analysis_2022/Partial_Correlation_CARDATA/Tkachenko")
 ```
 
@@ -34,9 +31,6 @@ library(dplyr) # dataframe
 
 
 ```{r}
-
-
-# data <- read_excel("StatAnal/Task_1/MY101.xls")
 data <- read_excel("../CARDATA.xls")
 data <- data %>%
     mutate(
@@ -63,50 +57,43 @@ data_factor <- data %>%
 
 # pdf(file = "ggpairs.pdf")
 ggpairs(data_factor,
-    # columns = c(1:8, 11),
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10))
-)
+) + ggtitle("ggpairs")
 # dev.off()
 ```
 
 
 ```{r}
-
 # pdf(file = "ggpairs_grouped_cylinder.pdf")
 ggpairs(data_factor,
     aes(colour = CYLINDER),
-    # columns = c(1:8, 11),
     upper = list(continuous = wrap("cor", digits = 2)),
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10)),
-)
+) + ggtitle("ggpairs_grouped_cylinder")
 # dev.off()
 ```
 
 ```{r}
-
 # pdf(file = "ggpairs_grouped_year.pdf")
 ggpairs(data_factor,
     aes(colour = YEAR),
-    # columns = c(1:8, 11),
     upper = list(continuous = wrap("cor", digits = 2)),
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10)),
-)
+) + ggtitle("ggpairs_grouped_year")
 # dev.off()
 ```
 
 ```{r}
-
 # pdf(file = "ggpairs_grouped_origin.pdf")
 ggpairs(data_factor,
     aes(colour = ORIGIN),
-    # columns = c(1:8, 11),
     upper = list(continuous = wrap("cor", digits = 2)),
     lower = list(combo = wrap("facethist", bins = 10)),
     diag = list(continuous = wrap("barDiag", bins = 10)),
-)
+) + ggtitle("ggpairs_grouped_origin")
 # dev.off()
 ```
 
@@ -116,10 +103,8 @@ ggpairs(data_factor,
 ggplot(melt(cor(data, method = "pearson"))) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
-    theme_dark()
-
-# print(melt(cor(data, method = "pearson")))
-# print((cor(data, method = "pearson")))
+    theme_dark() +
+    ggtitle("cor_matrix_pearson")
 # dev.off()
 ```
 
@@ -128,7 +113,8 @@ ggplot(melt(cor(data, method = "pearson"))) +
 ggplot(melt(cor(data, method = "spearman"))) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
-    theme_dark()
+    theme_dark() +
+    ggtitle("cor_matrix_spearman")
 # dev.off()
 ```
 
@@ -137,7 +123,8 @@ ggplot(melt(cor(data, method = "spearman"))) +
 ggplot(melt(pcor(data, method = "pearson")$estimate)) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
-    theme_dark()
+    theme_dark() +
+    ggtitle("partial_cor_matrix_pearson")
 # dev.off()
 ```
 
@@ -146,6 +133,25 @@ ggplot(melt(pcor(data, method = "pearson")$estimate)) +
 ggplot(melt(pcor(data, method = "spearman")$estimate)) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
-    theme_dark()
+    theme_dark() +
+    ggtitle("partial_cor_matrix_spearman")
+# dev.off()
+```
+
+```{r}
+# pdf(file = "partial_cor_matrix_by_cylinder.pdf")
+partial_cor_matrix_by_cylinder <- melt(cor(data %>% select(-CYLINDER), method = "pearson"))[, 1:2]
+partial_cor_matrix_by_cylinder$value <- (apply(partial_cor_matrix_by_cylinder, 1, function(x) {
+    if (x[1] == x[2]) {
+        return(1)
+    }
+    return(pcor.test(data[[as.character(x[1])]], data[[as.character(x[2])]], data$CYLINDER)$estimate)
+}))
+
+ggplot(partial_cor_matrix_by_cylinder) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark() +
+    ggtitle("partial_cor_matrix_by_cylinder")
 # dev.off()
 ```
