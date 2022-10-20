@@ -32,11 +32,17 @@ library(dplyr) # dataframe
 
 ```{r}
 data <- read_excel("../CARDATA.xls")
+```
+
+
+```{r}
 data <- data %>%
     mutate(
         ROW = NULL,
         MPG = 1 / MPG,
         ACCEL = 1 / ACCEL,
+        HORSEPOW = log(HORSEPOW),
+        DISPLACE = log(DISPLACE),
         PRICE = log(PRICE)
     ) %>%
     rename(GPM = MPG) %>%
@@ -50,51 +56,55 @@ data_factor <- data %>%
         YEAR = as.factor(YEAR),
         ORIGIN = as.factor(ORIGIN),
     )
+
+# data$ORIGIN <- NULL
+data <- data %>% relocate(YEAR, .after = PRICE)
+# data$YEAR <- NULL
 ```
 
 
 ```{r}
 
-# pdf(file = "ggpairs.pdf")
-ggpairs(data_factor,
-    lower = list(combo = wrap("facethist", bins = 10)),
-    diag = list(continuous = wrap("barDiag", bins = 10))
-) + ggtitle("ggpairs")
-# dev.off()
+# # pdf(file = "ggpairs.pdf")
+# ggpairs(data_factor,
+#     lower = list(combo = wrap("facethist", bins = 10)),
+#     diag = list(continuous = wrap("barDiag", bins = 10))
+# ) + ggtitle("ggpairs")
+# # dev.off()
 ```
 
 
 ```{r}
-# pdf(file = "ggpairs_grouped_cylinder.pdf")
-ggpairs(data_factor,
-    aes(colour = CYLINDER),
-    upper = list(continuous = wrap("cor", digits = 2)),
-    lower = list(combo = wrap("facethist", bins = 10)),
-    diag = list(continuous = wrap("barDiag", bins = 10)),
-) + ggtitle("ggpairs_grouped_cylinder")
-# dev.off()
+# # pdf(file = "ggpairs_grouped_cylinder.pdf")
+# ggpairs(data_factor,
+#     aes(colour = CYLINDER),
+#     upper = list(continuous = wrap("cor", digits = 2)),
+#     lower = list(combo = wrap("facethist", bins = 10)),
+#     diag = list(continuous = wrap("barDiag", bins = 10)),
+# ) + ggtitle("ggpairs_grouped_cylinder")
+# # dev.off()
 ```
 
 ```{r}
-# pdf(file = "ggpairs_grouped_year.pdf")
-ggpairs(data_factor,
-    aes(colour = YEAR),
-    upper = list(continuous = wrap("cor", digits = 2)),
-    lower = list(combo = wrap("facethist", bins = 10)),
-    diag = list(continuous = wrap("barDiag", bins = 10)),
-) + ggtitle("ggpairs_grouped_year")
-# dev.off()
+# # pdf(file = "ggpairs_grouped_year.pdf")
+# ggpairs(data_factor,
+#     aes(colour = YEAR),
+#     upper = list(continuous = wrap("cor", digits = 2)),
+#     lower = list(combo = wrap("facethist", bins = 10)),
+#     diag = list(continuous = wrap("barDiag", bins = 10)),
+# ) + ggtitle("ggpairs_grouped_year")
+# # dev.off()
 ```
 
 ```{r}
-# pdf(file = "ggpairs_grouped_origin.pdf")
-ggpairs(data_factor,
-    aes(colour = ORIGIN),
-    upper = list(continuous = wrap("cor", digits = 2)),
-    lower = list(combo = wrap("facethist", bins = 10)),
-    diag = list(continuous = wrap("barDiag", bins = 10)),
-) + ggtitle("ggpairs_grouped_origin")
-# dev.off()
+# # pdf(file = "ggpairs_grouped_origin.pdf")
+# ggpairs(data_factor,
+#     aes(colour = ORIGIN),
+#     upper = list(continuous = wrap("cor", digits = 2)),
+#     lower = list(combo = wrap("facethist", bins = 10)),
+#     diag = list(continuous = wrap("barDiag", bins = 10)),
+# ) + ggtitle("ggpairs_grouped_origin")
+# # dev.off()
 ```
 
 
@@ -120,7 +130,7 @@ ggplot(melt(cor(data, method = "spearman"))) +
 
 ```{r}
 # pdf(file = "partial_cor_matrix_pearson.pdf")
-ggplot(melt(pcor(data, method = "pearson")$estimate)) +
+ggplot(melt(pcor(data %>% select(-YEAR, -PRICE), method = "pearson")$estimate)) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
     theme_dark() +
@@ -154,4 +164,27 @@ ggplot(partial_cor_matrix_by_cylinder) +
     theme_dark() +
     ggtitle("partial_cor_matrix_by_cylinder")
 # dev.off()
+```
+
+```{r}
+
+
+print(pcor.test(data$ACCEL, data$WEIGHT, data$HORSEPOW)$estimate)
+print(cor(x = data$ACCEL, y = data$WEIGHT))
+
+
+print(pcor.test(data$ACCEL, data$HORSEPOW, data$WEIGHT))
+print(cor(x = data$ACCEL, y = data$HORSEPOW))
+```
+
+
+```{r}
+ggplot(data) +
+    geom_point(aes(x = HORSEPOW, y = PRICE, color = as.factor(YEAR)),
+        size = 5
+    )
+
+
+print(pcor.test(data$PRICE, data$HORSEPOW, data$YEAR)$estimate)
+print(cor(x = data$PRICE, y = data$HORSEPOW))
 ```
