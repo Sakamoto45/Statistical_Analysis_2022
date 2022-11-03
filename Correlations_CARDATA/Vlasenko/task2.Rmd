@@ -1,0 +1,166 @@
+---
+title: "Task2"
+output: html_document
+---
+Убираем индивидов с пропусками, убираем информацию о моделях и производителе,
+оставляем машины с четным количеством цилиндров (остальных слишком мало), 
+делаем соответствующие столбцы факторами.
+```{r, message=FALSE}
+library(readxl)
+library(dplyr)
+library(tidyr)
+
+df <- read_excel("../CARDATA.xls")  %>% 
+  drop_na() %>% 
+  filter(CYLINDER %in% c(4, 6, 8)) %>% 
+  select(-MAKE, -MODEL) %>% 
+  mutate(ROW = NULL, CYLINDER = as.factor(CYLINDER), 
+         YEAR = as.factor(YEAR), ORIGIN = as.factor(ORIGIN))
+
+```
+
+```{r}
+head(df)
+```
+ORIGIN: 1 - США, 2 - Европа, 3 - Япония.
+Посмотрим на корреляции.
+```{r, message = FALSE}
+library(ggplot2)
+library(GGally)
+
+df %>%ggpairs(diag=list(continuous = "barDiag"),
+              columns = c("MPG", "DISPLACE", "HORSEPOW", "ACCEL", "WEIGHT", "PRICE"))
+df %>%ggpairs(diag=list(continuous = "barDiag"), aes(colour = CYLINDER), legend = 1,
+              columns = c("MPG", "DISPLACE", "HORSEPOW", "ACCEL", "WEIGHT", "PRICE"))
+df %>%ggpairs(diag=list(continuous = "barDiag"), aes(colour = YEAR), legend = 1,
+              columns = c("MPG", "DISPLACE", "HORSEPOW", "ACCEL", "WEIGHT", "PRICE"))
+df %>%ggpairs(diag=list(continuous = "barDiag"), aes(colour = ORIGIN), legend = 1,
+              columns = c("MPG", "DISPLACE", "HORSEPOW", "ACCEL", "WEIGHT", "PRICE"))
+```
+Посмотрим на корреляции логарифмированных данных.
+```{r,  message = FALSE}
+dfLog <- df %>% mutate(MPG = log(MPG), DISPLACE = log(DISPLACE), 
+                         HORSEPOW = log(HORSEPOW), ACCEL = log(ACCEL), 
+                         WEIGHT = log(WEIGHT), PRICE = log(PRICE))
+```
+
+```{r,  message = FALSE}
+dfLog %>%ggpairs(diag=list(continuous = "barDiag"),
+              columns = c("MPG", "DISPLACE", "HORSEPOW", "ACCEL", "WEIGHT", "PRICE"))
+dfLog %>%ggpairs(diag=list(continuous = "barDiag"), aes(colour = CYLINDER), legend = 1,
+              columns = c("MPG", "DISPLACE", "HORSEPOW", "ACCEL", "WEIGHT", "PRICE"))
+dfLog %>%ggpairs(diag=list(continuous = "barDiag"), aes(colour = YEAR), legend = 1,
+              columns = c("MPG", "DISPLACE", "HORSEPOW", "ACCEL", "WEIGHT", "PRICE"))
+dfLog %>%ggpairs(diag=list(continuous = "barDiag"), aes(colour = ORIGIN), legend = 1,
+              columns = c("MPG", "DISPLACE", "HORSEPOW", "ACCEL", "WEIGHT", "PRICE"))
+```
+Сравним корреляции данных до и после логарифмирования.
+```{r, warning=FALSE, message = FALSE}
+library(reshape)
+
+ggplot(melt(cor(select(df, -CYLINDER, -YEAR, -ORIGIN), method = "pearson")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 3))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) + 
+  ggtitle("pearson")
+ggplot(melt(cor(select(dfLog, -CYLINDER, -YEAR, -ORIGIN), method = "pearson")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 3))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) + 
+  ggtitle("pearson log")
+ggplot(melt(cor(select(df, -CYLINDER, -YEAR, -ORIGIN), method = "spearman")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 3))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) +
+  ggtitle("spearman")
+ggplot(melt(cor(select(dfLog, -CYLINDER, -YEAR, -ORIGIN), method = "spearman")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 3))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) +
+  ggtitle("spearman log")
+ggplot(melt(cor(select(df, -CYLINDER, -YEAR, -ORIGIN), method = "kendall")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 3))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) +
+  ggtitle("kendall")
+ggplot(melt(cor(select(dfLog, -CYLINDER, -YEAR, -ORIGIN), method = "kendall")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 3))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) +
+  ggtitle("kendall log")
+```
+Можно заметить, что монотонные преобразования не влияют на Спирмана и Кендала и 
+что Кендал меньше по модулю Спирмана и Кендала.
+
+Посмотрим на наличие аутлайнеров.
+```{r}
+library(ggpubr)
+
+dfLog[1,9] <- 100
+
+MPG <- dfLog %>% ggplot(aes(y=MPG)) + geom_boxplot()
+DISPLACE <- dfLog %>% ggplot(aes(y=DISPLACE)) + geom_boxplot()
+HORSEPOW <- dfLog %>% ggplot(aes(y=HORSEPOW)) + geom_boxplot()
+ACCEL <- dfLog %>% ggplot(aes(y=ACCEL)) + geom_boxplot()
+WEIGHT <- dfLog %>% ggplot(aes(y=WEIGHT)) + geom_boxplot()
+PRICE <- dfLog %>% ggplot(aes(y=PRICE)) + geom_boxplot()
+
+ggarrange(MPG, DISPLACE, HORSEPOW, ACCEL, WEIGHT, PRICE,
+          ncol = 3, nrow = 2)
+```
+Уберем выбросы и посмотрим, как это влияет на коэффициенты корреляции.
+```{r}
+dfLogOutlinersOff <- dfLog
+
+Q1 <- quantile(dfLogOutlinersOff$ACCEL, probs=c(.25, .75))
+iqr1 <- IQR(dfLogOutlinersOff$ACCEL)
+up1 <- Q1[2]+1.5*iqr1
+low1 <- Q1[1]-1.5*iqr1
+
+Q2 <- quantile(dfLogOutlinersOff$PRICE, probs=c(.25, .75))
+iqr2 <- IQR(dfLogOutlinersOff$PRICE)
+up2 <- Q2[2]+1.5*iqr2
+low2 <- Q2[1]-1.5*iqr2
+
+tmp1 <-length(dfLogOutlinersOff$MPG)
+dfLogOutlinersOff <- dfLogOutlinersOff %>% filter(ACCEL > low1, ACCEL < up1,
+                                                  PRICE > low2, PRICE < up2)
+tmp2 <- length(dfLogOutlinersOff$MPG)
+tmp1 - tmp2
+```
+```{r, warning=FALSE}
+ggplot(melt(cor(select(dfLog, -CYLINDER, -YEAR, -ORIGIN), method = "pearson")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 1))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) + 
+  ggtitle("pearson log")
+ggplot(melt(cor(select(dfLogOutlinersOff, -CYLINDER, -YEAR, -ORIGIN), method = "pearson")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 1))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) + 
+  ggtitle("pearson log outlinersOff")
+ggplot(melt(cor(select(dfLog, -CYLINDER, -YEAR, -ORIGIN), method = "spearman")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 1))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) +
+  ggtitle("spearman log")
+ggplot(melt(cor(select(dfLogOutlinersOff, -CYLINDER, -YEAR, -ORIGIN), method = "spearman")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 1))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) +
+  ggtitle("spearman log outlinersOff")
+ggplot(melt(cor(select(dfLog, -CYLINDER, -YEAR, -ORIGIN), method = "kendall")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 1))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) +
+  ggtitle("kendall log")
+ggplot(melt(cor(select(dfLogOutlinersOff, -CYLINDER, -YEAR, -ORIGIN), method = "kendall")), aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 1))) +
+  scale_fill_gradient2(low=colors()[143], mid='white', high=colors()[639]) +
+  ggtitle("kendall log outlinersOff")
+```
+Если есть сильный выброс, то он сильно влияет на Пирсона.
+
+
+
