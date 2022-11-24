@@ -1,0 +1,175 @@
+---
+title: "CITY_US"
+output:
+    html_document:
+        df_print: paged
+---
+
+
+```{r, include=FALSE, warning=FALSE, message = FALSE}
+knitr::opts_chunk$set(fig.width = 8, fig.height = 8)
+# knitr::opts_chunk$set(
+#     # This should allow Rmarkdown to locate the data
+#     root.dir = rprojroot::find_rstudio_root_file()
+# )
+library(readxl)
+library(reshape2)
+library(ggplot2)
+library(GGally)
+library(stringr)
+library(dplyr)
+library(correlation) # cor_sort
+library(forcats)
+library(tidyr)
+```
+
+Ввод данных
+```{r, warning=FALSE, message = FALSE}
+# setwd("R/Statistical_Analysis_2022/CITY_US/Tkachenko")
+data <- read_excel("../CITY_US.STD/CITY_shortname.xls")
+# print(data[, c("INCOME")])
+data[data == "NA"] <- NA
+data$INCOME[data$INCOME < 100] <- NA
+# data <- data %>% drop_na()
+data[, -(1:2)] <- data.frame(lapply(data[, -(1:2)], as.numeric))
+print(head(data))
+print(names(data))
+```
+
+```{r, warning=FALSE, message = FALSE}
+temper_split <- mean(data$TEMPER)
+data$F_TEMPER <- factor(ifelse(data$TEMPER >= temper_split, "hot", "cold"))
+
+precep_split <- 20
+data$F_PRECEP <- factor(ifelse(data$PRECEP >= precep_split, "big", "small"))
+
+labor_split <- 5
+data$F_LABOR <- factor(ifelse(data$LABOR >= labor_split, "big", "small"))
+
+pop_ch_split <- 0
+data$F_POP_CH <- factor(ifelse(data$POP_CH >= pop_ch_split, "growth", "decrease"))
+```
+
+```{r, warning=FALSE, message = FALSE}
+
+names <- names(data)
+fullnames <- names(read_excel("../CITY_US.STD/CITY.xls"))
+print(fullnames)
+
+names_id <- c("CITY", "STATE", names[str_starts(names, "F_")])
+names_no_ranks <- names[!str_starts(names, "R_")]
+names_ranks <- names[str_starts(names, "R_")]
+```
+
+
+<!-- 
+c("AREA", "POP92", "POP80", "POP_CH", "POPDEN", 
+"OLD", "BLACK", "BLACK%", "ASIAN", "ASIAN%", "HISP", "HISP%", 
+  "HH1", "FAMIL1", "DEATH", "CRIME", "SCHOOL", 
+"DEGREE", "INCOME", "ASSIST", "POVERT", "OLB_BIL", "OWNER", "RENTER", 
+"GROSS", "CONDOM", "TRANSP", "UNEMP", "LABOR", "LAB_F", "MANLAB", 
+"TAXE", "TEMPER", "PRECEP") -->
+
+```{r, warning=FALSE, message = FALSE}
+logged <- names[!(str_starts(fullnames, "R_") | str_detect(fullnames, "%|rate"))]
+logged <- logged[-(1:2)]
+
+logged <- c(
+    "AREA", "POP92", "POP80", "POPDEN", "BLACK", "BLACK%", "ASIAN", "ASIAN%", "HISP", "HISP%", "BORN_F", "LANG", "INCOME", "OLB_BIL", "OWNER", "GROSS", "CONDOM", "TRANSP", "LABOR", "TAXE", "TEMPER", "PRECEP"
+)
+
+data_norm <- data
+data_norm[, logged] <- log(data_norm[, logged])
+```
+
+```{r, warning=FALSE, message = FALSE}
+
+plot_all_density <- function(data, aes) {
+    ggplot(data, aes) +
+        theme_bw() +
+        # geom_density() +
+        geom_histogram(aes(y = ..density..), bins = 15) +
+        facet_wrap(~variable, scales = "free") +
+        geom_line(aes(y = dnorm(value,
+            mean = tapply(value, variable, mean, na.rm = TRUE)[PANEL],
+            sd = tapply(value, variable, sd, na.rm = TRUE)[PANEL]
+        )), color = "black", linetype = 2) +
+        theme(legend.position = "bottom") +
+        labs(x = "", y = "")
+}
+
+data_melt <- melt(data[, names_no_ranks], id = names_id)
+# pdf(file = "no_ranks_plots.pdf")
+# plot_all_density(data_melt, aes(value, color = F_LABOR)) +
+#     scale_color_manual(values = c("blue", "red"))
+plot_all_density(data_melt, aes(value))
+# dev.off()
+```
+
+<!-- # ```{r pressure, echo=FALSE, fig.cap="A caption", out.width = '100%',  fig.height=100}
+# knitr::include_graphics("no_ranks_plots.pdf")
+# ``` -->
+
+```{r, warning=FALSE, message = FALSE}
+data_norm_melt <- melt(data_norm[, names_no_ranks], id = names_id)
+# pdf(file = "no_ranks_logged_plots.pdf")
+plot_all_density(data_norm_melt, aes(value))
+# dev.off()
+
+plot_all_density(data_norm_melt, aes(value, color = F_TEMPER)) +
+    scale_color_manual(values = c("blue", "red"))
+
+plot_all_density(data_norm_melt, aes(value, color = F_PRECEP)) +
+    scale_color_manual(values = c("blue", "red"))
+
+plot_all_density(data_norm_melt, aes(value, color = F_LABOR)) +
+    scale_color_manual(values = c("blue", "red"))
+
+plot_all_density(data_norm_melt, aes(value, color = F_POP_CH)) +
+    scale_color_manual(values = c("blue", "red"))
+```
+
+
+```{r, warning=FALSE, message = FALSE}
+# pdf(file = "cor_matrix.pdf")
+ggplot(melt(cor(data_norm[, !names %in% c(names_id, names_ranks)], method = "pearson", use = "pairwise.complete.obs"))) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+# dev.off()
+
+# pdf(file = "cor_sort_matrix.pdf")
+ggplot(melt(cor_sort(cor(data_norm[, !names %in% c(names_id, names_ranks)], method = "pearson", use = "pairwise.complete.obs")))) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+# dev.off()
+```
+
+
+
+
+```{r}
+names_interesting <- c("AREA", "POP80", "POP92", "POPDEN", "CRIME", "BORN_F", "POVERT", "INCOME", "UNEMP", "TEMPER")
+
+
+pdf("ggpairs.pdf")
+ggpairs(
+    data[, names_interesting],
+    lower = list(continuous = wrap("points", alpha = 0.5, size = 0.3)),
+    diag = list(continuous = "barDiag")
+)
+dev.off()
+```
+
+```{r}
+pdf("ggpairs_norm.pdf")
+ggpairs(
+    data_norm[, names_interesting],
+    lower = list(continuous = wrap("points", alpha = 0.5, size = 0.3)),
+    diag = list(continuous = "barDiag")
+)
+dev.off()
+```
