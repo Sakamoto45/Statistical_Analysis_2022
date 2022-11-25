@@ -1,0 +1,89 @@
+---
+title: "Task3"
+output: html_document
+date: "2022-11-11"
+---
+
+Прочитаем и обработаем данные. Среди данных не может быть отрицательных значений, 
+NA обозначаються как -999.
+```{r, message=FALSE, warning=FALSE}
+library(readxl)
+library(dplyr)
+library(tidyr)
+```
+
+```{r, message=FALSE, warning=FALSE}
+df <- read_excel("Sleep/SLEEP_shortname.xls")
+df[df < 0] <- NA
+
+head(df)
+length(df$NAME)
+```
+Посмотрим на данные.
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(GGally)
+```
+
+```{r, message=FALSE, warning=FALSE}
+df %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), 
+          columns = c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+Преобразуем данные. Переведем вес животного в граммы, продолжительность жизни в
+дни. Логарифмируем данные, чтобы было легче наблюдать корреляции (выше заметны 
+сильно отличающиеся индивиды, это слоны). Факторизуем индексы.
+```{r}
+dfNew <- df %>% mutate(PRED_IND = as.factor(PRED_IND), EXP_IND = as.factor(EXP_IND),
+                   DANG_IND = as.factor(DANG_IND), 
+                   BODY_WEI = log(BODY_WEI * 1000), BRAIN_WE = log(BRAIN_WE), 
+                   LIFESPAN = log(LIFESPAN * 365.25), GESTTIME = log(GESTTIME))
+```
+Посмотрим на новые данные. Сгруппируем индивидов по факторам. 
+```{r, message=FALSE, warning=FALSE}
+dfNew %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), 
+          columns = c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+dfNew %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), aes(colour=PRED_IND), legend=1,
+          columns=c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+dfNew %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), aes(colour=EXP_IND), legend=1,
+          columns=c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+dfNew %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), aes(colour=DANG_IND), legend=1,
+          columns=c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+Посмотрим на корреляции между признаками.
+```{r, warning=FALSE, message = FALSE}
+library(reshape)
+```
+
+```{r, warning=FALSE, message = FALSE}
+dplyr::select(dfNew, -NAME) %>%
+mutate(PRED_IND = as.numeric(PRED_IND), EXP_IND = as.numeric(EXP_IND), DANG_IND = as.numeric(DANG_IND)) %>%
+cor(method = "pearson", use = "pairwise.complete.obs") %>%
+melt() %>%
+ggplot(aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 3))) +
+  scale_fill_gradient2(low=colors()[555], mid=colors()[1], high=colors()[26]) + 
+  ggtitle("dfNew pearson") +
+  theme(axis.text.x = element_text(angle = 50, hjust = 1))
+
+dplyr::select(dfNew, -NAME) %>%
+mutate(PRED_IND = as.numeric(PRED_IND), EXP_IND = as.numeric(EXP_IND), DANG_IND = as.numeric(DANG_IND)) %>%
+cor(method = "spearman", use = "pairwise.complete.obs") %>%
+melt() %>%
+ggplot(aes(X1, X2)) +
+  geom_raster(aes(fill = value)) +
+  geom_text(aes(label = round(value, 3))) +
+  scale_fill_gradient2(low=colors()[555], mid=colors()[1], high=colors()[26]) + 
+  ggtitle("dfNew spearman") +
+  theme(axis.text.x = element_text(angle = 50, hjust = 1))
+  
+```
+
+
+
+
