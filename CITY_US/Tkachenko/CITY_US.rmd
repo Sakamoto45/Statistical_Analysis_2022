@@ -25,7 +25,7 @@ library(tidyr)
 
 Ввод данных
 ```{r, warning=FALSE, message = FALSE}
-# setwd("R/Statistical_Analysis_2022/CITY_US/Tkachenko")
+setwd("R/Statistical_Analysis_2022/CITY_US/Tkachenko")
 data <- read_excel("../CITY_US.STD/CITY_shortname.xls")
 # print(data[, c("INCOME")])
 data[data == "NA"] <- NA
