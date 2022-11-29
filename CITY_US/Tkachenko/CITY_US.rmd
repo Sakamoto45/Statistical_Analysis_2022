@@ -21,22 +21,32 @@ library(dplyr)
 library(correlation) # cor_sort
 library(forcats)
 library(tidyr)
+library(symmetry)
 ```
 
 Ввод данных
-```{r, warning=FALSE, message = FALSE}
-setwd("R/Statistical_Analysis_2022/CITY_US/Tkachenko")
-data <- read_excel("../CITY_US.STD/CITY_shortname.xls")
-# print(data[, c("INCOME")])
-data[data == "NA"] <- NA
-data$INCOME[data$INCOME < 100] <- NA
-# data <- data %>% drop_na()
-data[, -(1:2)] <- data.frame(lapply(data[, -(1:2)], as.numeric))
-print(head(data))
-print(names(data))
-```
+
+Помечаю некорректные данные как NA.
+Удаляю города из Аляски.
 
 ```{r, warning=FALSE, message = FALSE}
+if (interactive() & !str_ends(getwd(), "R/Statistical_Analysis_2022/CITY_US/Tkachenko")) 
+    setwd("R/Statistical_Analysis_2022/CITY_US/Tkachenko")
+
+
+data <- read_excel("../CITY_US.STD/CITY_shortname.xls")
+
+data[data == "NA"] <- NA
+data$INCOME[data$INCOME < 100] <- NA
+
+data <- data %>% filter(STATE != "AK")
+data[, -(1:2)] <- data.frame(lapply(data[, -(1:2)], as.numeric))
+
+print(head(data))
+# print(names(data))
+```
+
+```{r, warning=FALSE, message = FALSE, include=FALSE}
 temper_split <- mean(data$TEMPER)
 data$F_TEMPER <- factor(ifelse(data$TEMPER >= temper_split, "hot", "cold"))
 
@@ -54,35 +64,33 @@ data$F_POP_CH <- factor(ifelse(data$POP_CH >= pop_ch_split, "growth", "decrease"
 
 names <- names(data)
 fullnames <- names(read_excel("../CITY_US.STD/CITY.xls"))
-print(fullnames)
+# print(fullnames)
 
 names_id <- c("CITY", "STATE", names[str_starts(names, "F_")])
 names_no_ranks <- names[!str_starts(names, "R_")]
 names_ranks <- names[str_starts(names, "R_")]
 ```
 
-
-<!-- 
-c("AREA", "POP92", "POP80", "POP_CH", "POPDEN", 
-"OLD", "BLACK", "BLACK%", "ASIAN", "ASIAN%", "HISP", "HISP%", 
-  "HH1", "FAMIL1", "DEATH", "CRIME", "SCHOOL", 
-"DEGREE", "INCOME", "ASSIST", "POVERT", "OLB_BIL", "OWNER", "RENTER", 
-"GROSS", "CONDOM", "TRANSP", "UNEMP", "LABOR", "LAB_F", "MANLAB", 
-"TAXE", "TEMPER", "PRECEP") -->
+функция, которая логарифмирует, если это сделает выборку симметричнее
 
 ```{r, warning=FALSE, message = FALSE}
-logged <- names[!(str_starts(fullnames, "R_") | str_detect(fullnames, "%|rate"))]
-logged <- logged[-(1:2)]
 
-logged <- c(
-    "AREA", "POP92", "POP80", "POPDEN", "BLACK", "BLACK%", "ASIAN", "ASIAN%", "HISP", "HISP%", "BORN_F", "LANG", "INCOME", "OLB_BIL", "OWNER", "GROSS", "CONDOM", "TRANSP", "LABOR", "TAXE", "TEMPER", "PRECEP"
-)
-
-data_norm <- data
-data_norm[, logged] <- log(data_norm[, logged])
+log_asymmetric <- function(x) {
+    if (min(x[!is.na(x)]) < 0) {
+        return(x)
+    }
+    if (symmetry_test(x[!is.na(x)], "SGN")$p.value <
+        symmetry_test(log(x[!is.na(x)]), "SGN")$p.value) {
+        return(log(x))
+    } else {
+        return(x)
+    }
+}
 ```
 
-```{r, warning=FALSE, message = FALSE}
+```{r, warning=FALSE, message = FALSE, include=FALSE}
+data_logged <- data %>%
+    mutate(across(names[!str_detect(names, "R_|F_|CITY|STATE")], log_asymmetric))
 
 plot_all_density <- function(data, aes) {
     ggplot(data, aes) +
@@ -99,77 +107,90 @@ plot_all_density <- function(data, aes) {
 }
 
 data_melt <- melt(data[, names_no_ranks], id = names_id)
-# pdf(file = "no_ranks_plots.pdf")
+
+if (interactive()) pdf(file = "no_ranks_plots.pdf")
 # plot_all_density(data_melt, aes(value, color = F_LABOR)) +
 #     scale_color_manual(values = c("blue", "red"))
 plot_all_density(data_melt, aes(value))
-# dev.off()
+if (interactive()) dev.off()
 ```
 
-<!-- # ```{r pressure, echo=FALSE, fig.cap="A caption", out.width = '100%',  fig.height=100}
-# knitr::include_graphics("no_ranks_plots.pdf")
-# ``` -->
+```{r, warning=FALSE, message = FALSE, include=FALSE}
+data_logged_melt <- melt(data_logged[, names_no_ranks], id = names_id)
+if (interactive()) pdf(file = "no_ranks_logged_plots.pdf")
+plot_all_density(data_logged_melt, aes(value))
+if (interactive()) dev.off()
 
-```{r, warning=FALSE, message = FALSE}
-data_norm_melt <- melt(data_norm[, names_no_ranks], id = names_id)
-# pdf(file = "no_ranks_logged_plots.pdf")
-plot_all_density(data_norm_melt, aes(value))
-# dev.off()
+# plot_all_density(data_logged_melt, aes(value, color = F_TEMPER)) +
+#     scale_color_manual(values = c("blue", "red"))
 
-plot_all_density(data_norm_melt, aes(value, color = F_TEMPER)) +
-    scale_color_manual(values = c("blue", "red"))
+# plot_all_density(data_logged_melt, aes(value, color = F_PRECEP)) +
+#     scale_color_manual(values = c("blue", "red"))
 
-plot_all_density(data_norm_melt, aes(value, color = F_PRECEP)) +
-    scale_color_manual(values = c("blue", "red"))
+# plot_all_density(data_logged_melt, aes(value, color = F_LABOR)) +
+#     scale_color_manual(values = c("blue", "red"))
 
-plot_all_density(data_norm_melt, aes(value, color = F_LABOR)) +
-    scale_color_manual(values = c("blue", "red"))
-
-plot_all_density(data_norm_melt, aes(value, color = F_POP_CH)) +
-    scale_color_manual(values = c("blue", "red"))
+# plot_all_density(data_logged_melt, aes(value, color = F_POP_CH)) +
+#     scale_color_manual(values = c("blue", "red"))
 ```
 
 
-```{r, warning=FALSE, message = FALSE}
-# pdf(file = "cor_matrix.pdf")
-ggplot(melt(cor(data_norm[, !names %in% c(names_id, names_ranks)], method = "pearson", use = "pairwise.complete.obs"))) +
+```{r, warning=FALSE, message = FALSE, include=FALSE}
+if (interactive()) pdf(file = "cor_matrix.pdf")
+ggplot(melt(cor(data_logged[, !names %in% c(names_id, names_ranks)], method = "pearson", use = "pairwise.complete.obs"))) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
     theme_dark() +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-# dev.off()
+if (interactive()) dev.off()
 
-# pdf(file = "cor_sort_matrix.pdf")
-ggplot(melt(cor_sort(cor(data_norm[, !names %in% c(names_id, names_ranks)], method = "pearson", use = "pairwise.complete.obs")))) +
+if (interactive()) pdf(file = "cor_sort_matrix.pdf")
+ggplot(melt(cor_sort(cor(data_logged[, !names %in% c(names_id, names_ranks)], method = "pearson", use = "pairwise.complete.obs")))) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
     theme_dark() +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-# dev.off()
+if (interactive()) dev.off()
 ```
 
 
 
-
-```{r}
+Выбираю только интересные признаки.
+Логарифмирую те признаки, которые от этого станут симметричнее 
+```{r, warning=FALSE, message = FALSE}
 names_interesting <- c("AREA", "POP80", "POP92", "POPDEN", "CRIME", "BORN_F", "POVERT", "INCOME", "UNEMP", "TEMPER")
 
+data_interesting <- data[, names_interesting]
 
-pdf("ggpairs.pdf")
-ggpairs(
-    data[, names_interesting],
-    lower = list(continuous = wrap("points", alpha = 0.5, size = 0.3)),
-    diag = list(continuous = "barDiag")
-)
-dev.off()
+data_interesting_logged <- data_interesting %>%
+    mutate(across(everything(), log_asymmetric))
 ```
 
-```{r}
-pdf("ggpairs_norm.pdf")
+
+Скаттерплот
+
+```{r, warning=FALSE, message = FALSE}
+if (interactive()) pdf("ggpairs_logged.pdf")
 ggpairs(
-    data_norm[, names_interesting],
+    data_interesting_logged,
     lower = list(continuous = wrap("points", alpha = 0.5, size = 0.3)),
     diag = list(continuous = "barDiag")
 )
-dev.off()
+if (interactive()) dev.off()
+```
+
+Матрица корреляций
+
+```{r, warning=FALSE, message = FALSE}
+
+data_interesting_logged <- data_interesting_logged %>%
+    relocate(TEMPER, AREA, POP92, POP80, POPDEN, INCOME, BORN_F, UNEMP, POVERT, CRIME)
+
+if (interactive()) pdf(file = "cor_matrix.pdf")
+ggplot(melt(cor(data_interesting_logged, method = "pearson", use = "pairwise.complete.obs"))) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    scale_fill_gradient2() +
+    theme_dark() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+if (interactive()) dev.off()
 ```
