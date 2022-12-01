@@ -6,7 +6,7 @@ output:
 ---
 
 
-```{r, include=FALSE, warning=FALSE, message = FALSE}
+```{r, include=FALSE}
 knitr::opts_chunk$set(fig.width = 8, fig.height = 8)
 # knitr::opts_chunk$set(
 #     # This should allow Rmarkdown to locate the data
@@ -22,175 +22,272 @@ library(correlation) # cor_sort
 library(forcats)
 library(tidyr)
 library(symmetry)
+library(moments)
+library(qqplotr)
+library(nortest)
+library(entropy)
 ```
 
 Ввод данных
 
-Помечаю некорректные данные как NA.
-Удаляю города из Аляски.
-
-```{r, warning=FALSE, message = FALSE}
-if (interactive() & !str_ends(getwd(), "R/Statistical_Analysis_2022/CITY_US/Tkachenko")) 
+```{r}
+if (interactive() && !str_ends(getwd(), "R/Statistical_Analysis_2022/CITY_US/Tkachenko")) {
     setwd("R/Statistical_Analysis_2022/CITY_US/Tkachenko")
-
+}
 
 data <- read_excel("../CITY_US.STD/CITY_shortname.xls")
-
 data[data == "NA"] <- NA
-data$INCOME[data$INCOME < 100] <- NA
-
-data <- data %>% filter(STATE != "AK")
 data[, -(1:2)] <- data.frame(lapply(data[, -(1:2)], as.numeric))
-
-print(head(data))
-# print(names(data))
-```
-
-```{r, warning=FALSE, message = FALSE, include=FALSE}
-temper_split <- mean(data$TEMPER)
-data$F_TEMPER <- factor(ifelse(data$TEMPER >= temper_split, "hot", "cold"))
-
-precep_split <- 20
-data$F_PRECEP <- factor(ifelse(data$PRECEP >= precep_split, "big", "small"))
-
-labor_split <- 5
-data$F_LABOR <- factor(ifelse(data$LABOR >= labor_split, "big", "small"))
-
-pop_ch_split <- 0
-data$F_POP_CH <- factor(ifelse(data$POP_CH >= pop_ch_split, "growth", "decrease"))
-```
-
-```{r, warning=FALSE, message = FALSE}
-
-names <- names(data)
 fullnames <- names(read_excel("../CITY_US.STD/CITY.xls"))
-# print(fullnames)
-
-names_id <- c("CITY", "STATE", names[str_starts(names, "F_")])
-names_no_ranks <- names[!str_starts(names, "R_")]
-names_ranks <- names[str_starts(names, "R_")]
 ```
 
-функция, которая логарифмирует, если это сделает выборку симметричнее
+Выбираю только инетересные признаки
 
-```{r, warning=FALSE, message = FALSE}
-
-log_asymmetric <- function(x) {
-    if (min(x[!is.na(x)]) < 0) {
-        return(x)
-    }
-    if (symmetry_test(x[!is.na(x)], "SGN")$p.value <
-        symmetry_test(log(x[!is.na(x)]), "SGN")$p.value) {
-        return(log(x))
-    } else {
-        return(x)
-    }
-}
-```
-
-```{r, warning=FALSE, message = FALSE, include=FALSE}
-data_logged <- data %>%
-    mutate(across(names[!str_detect(names, "R_|F_|CITY|STATE")], log_asymmetric))
-
-plot_all_density <- function(data, aes) {
-    ggplot(data, aes) +
-        theme_bw() +
-        # geom_density() +
-        geom_histogram(aes(y = ..density..), bins = 15) +
-        facet_wrap(~variable, scales = "free") +
-        geom_line(aes(y = dnorm(value,
-            mean = tapply(value, variable, mean, na.rm = TRUE)[PANEL],
-            sd = tapply(value, variable, sd, na.rm = TRUE)[PANEL]
-        )), color = "black", linetype = 2) +
-        theme(legend.position = "bottom") +
-        labs(x = "", y = "")
-}
-
-data_melt <- melt(data[, names_no_ranks], id = names_id)
-
-if (interactive()) pdf(file = "no_ranks_plots.pdf")
-# plot_all_density(data_melt, aes(value, color = F_LABOR)) +
-#     scale_color_manual(values = c("blue", "red"))
-plot_all_density(data_melt, aes(value))
-if (interactive()) dev.off()
-```
-
-```{r, warning=FALSE, message = FALSE, include=FALSE}
-data_logged_melt <- melt(data_logged[, names_no_ranks], id = names_id)
-if (interactive()) pdf(file = "no_ranks_logged_plots.pdf")
-plot_all_density(data_logged_melt, aes(value))
-if (interactive()) dev.off()
-
-# plot_all_density(data_logged_melt, aes(value, color = F_TEMPER)) +
-#     scale_color_manual(values = c("blue", "red"))
-
-# plot_all_density(data_logged_melt, aes(value, color = F_PRECEP)) +
-#     scale_color_manual(values = c("blue", "red"))
-
-# plot_all_density(data_logged_melt, aes(value, color = F_LABOR)) +
-#     scale_color_manual(values = c("blue", "red"))
-
-# plot_all_density(data_logged_melt, aes(value, color = F_POP_CH)) +
-#     scale_color_manual(values = c("blue", "red"))
-```
-
-
-```{r, warning=FALSE, message = FALSE, include=FALSE}
-if (interactive()) pdf(file = "cor_matrix.pdf")
-ggplot(melt(cor(data_logged[, !names %in% c(names_id, names_ranks)], method = "pearson", use = "pairwise.complete.obs"))) +
-    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
-    scale_fill_gradient2() +
-    theme_dark() +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-if (interactive()) dev.off()
-
-if (interactive()) pdf(file = "cor_sort_matrix.pdf")
-ggplot(melt(cor_sort(cor(data_logged[, !names %in% c(names_id, names_ranks)], method = "pearson", use = "pairwise.complete.obs")))) +
-    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
-    scale_fill_gradient2() +
-    theme_dark() +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-if (interactive()) dev.off()
-```
-
-
-
-Выбираю только интересные признаки.
-Логарифмирую те признаки, которые от этого станут симметричнее 
-```{r, warning=FALSE, message = FALSE}
+```{r}
 names_interesting <- c("AREA", "POP80", "POP92", "POPDEN", "CRIME", "BORN_F", "POVERT", "INCOME", "UNEMP", "TEMPER")
 
-data_interesting <- data[, names_interesting]
+data <- data %>% select(c("CITY", "STATE", names_interesting))
 
-data_interesting_logged <- data_interesting %>%
-    mutate(across(everything(), log_asymmetric))
+print(head(data))
 ```
 
 
-Скаттерплот
+PairsPlot
 
-```{r, warning=FALSE, message = FALSE}
-if (interactive()) pdf("ggpairs_logged.pdf")
+```{r}
+if (interactive()) pdf("ggpairs_unedited.pdf")
 ggpairs(
-    data_interesting_logged,
+    data[, -(1:2)],
     lower = list(continuous = wrap("points", alpha = 0.5, size = 0.3)),
     diag = list(continuous = "barDiag")
 )
 if (interactive()) dev.off()
 ```
 
+Убираю outliers:
+
+Помечаю некорректные данные в INCOME как NA.
+Удаляю город из Аляски.
+```{r}
+data$INCOME[data$INCOME < 100] <- NA
+data <- data %>% filter(STATE != "AK")
+```
+
+Функция, которая логарифмирует, если это сделает выборку симметричнее
+
+```{r}
+log_asymmetric <- function(x) {
+    if (skewness(x, na.rm = TRUE) < abs(skewness(log(x), na.rm = TRUE))) {
+        print("default")
+        return(x)
+    } else {
+        print("logged")
+        return(log(x))
+    }
+}
+```
+
+Автоматически логарифмирую то что имеет ассиметрию  и длинный хвост справа
+
+```{r}
+data_logged <- data %>%
+    mutate(across(all_of(names_interesting), log_asymmetric))
+```
+
+```{r}
+if (interactive()) pdf("ggpairs_logged.pdf")
+ggpairs(
+    data_logged[, -(1:2)],
+    lower = list(continuous = wrap("points", alpha = 0.5, size = 0.3)),
+    diag = list(continuous = "barDiag")
+)
+if (interactive()) dev.off()
+```
+
+все распределения.
+```{r, warning=FALSE, message = FALSE, include=FALSE}
+# plot_all_density <- function(data, mapping = aes(value)) {
+#     ggplot(melt(data, id = c("CITY", "STATE")), mapping) +
+#         theme_bw() +
+#         geom_histogram(aes(y = ..density..), bins = 15) +
+#         # geom_density() +
+#         facet_wrap(~variable, scales = "free") +
+#         geom_line(aes(y = dnorm(value,
+#             mean = tapply(value, variable, mean, na.rm = TRUE)[PANEL],
+#             sd = tapply(value, variable, sd, na.rm = TRUE)[PANEL]
+#         )), color = "black", linetype = 2) +
+#         theme(legend.position = "bottom") +
+#         labs(x = "", y = "")
+# }
+
+if (interactive()) pdf(file = "all_density_plots.pdf")
+ggplot(melt(data_logged, id = c("CITY", "STATE")), aes(value)) +
+    theme_bw() +
+    geom_histogram(aes(y = ..density..), bins = 15) +
+    # geom_density() +
+    facet_wrap(~variable, scales = "free") +
+    geom_line(aes(y = dnorm(value,
+        mean = tapply(value, variable, mean, na.rm = TRUE)[PANEL],
+        sd = tapply(value, variable, sd, na.rm = TRUE)[PANEL]
+    )), color = "black", linetype = 2) +
+    theme(legend.position = "bottom") +
+    labs(x = "", y = "")
+if (interactive()) dev.off()
+```
+
+Normal probability plot
+
+```{r}
+if (interactive()) pdf(file = "normal_probability_plot.pdf")
+ggplot(melt(data_logged, id = c("CITY", "STATE")), aes(sample = value)) +
+    stat_qq_point(size = 2) +
+    geom_abline() +
+    facet_wrap(~variable, scales = "free")
+if (interactive()) dev.off()
+
+
+if (interactive()) pdf(file = "PP_plot.pdf")
+ggplot(melt(data_logged, id = c("CITY", "STATE")), aes(sample = value)) +
+    stat_pp_point(size = 2) +
+    facet_wrap(~variable, scales = "free") +
+    stat_pp_line()
+if (interactive()) dev.off()
+```
+
+Всякие тесты на нормальность
+```{r}
+test_all <- function(data, test, ...) {
+    print(test(1:10, ...)$method)
+    print(data %>% summarise(across(
+        everything(),
+        function(x) {
+            test(x, ...)$p.value
+        }
+    )))
+}
+
+test_all(data_logged[, -(1:2)], shapiro.test)
+test_all(data_logged[, -(1:2)], lillie.test)
+test_all(data_logged[, -(1:2)], ad.test)
+test_all(data_logged[, -(1:2)], pearson.test)
+```
+
+итак, все кроме населения распределено нормально (или логнормально)
+
+
+Описать разницу между численностью населения в 1980 и 1992 годах визуально (с помощью ящиков с усами)
+```{r}
+if (interactive()) pdf("boxplot_pop.pdf")
+ggplot(
+    melt(data_logged[, c("POP80", "POP92")]),
+    aes(variable, value)
+) +
+    geom_boxplot()
+if (interactive()) dev.off()
+```
+
+Маленькие города выросли, визуально медиана и первая квартиль увеличиись.
+
+Применять t-test нельзя: распределения не нормальные.
+Применить t-test можно: выборка не силишком маленькая (что такое маленькая?).
+Применять t-test нельзя: распределения не симметричные.
+
+Поэтому применю и t-test и u-test
+
+Альтернатива односторонняя, потому что для городов естественно расти.
+
+```{r}
+wilcox.test(data_logged$POP80, data_logged$POP92)
+
+var.test(data_logged$POP80, data_logged$POP92)
+
+t.test(
+    (data_logged$POP80 - mean(data_logged$POP80, na.rm = TRUE)) *
+        (data_logged$POP80 - mean(data_logged$POP80, na.rm = TRUE)),
+    (data_logged$POP92 - mean(data_logged$POP92, na.rm = TRUE)) *
+        (data_logged$POP92 - mean(data_logged$POP92, na.rm = TRUE))
+)
+
+# t.test(data_logged$POP80, data_logged$POP92, alternative = "less")
+```
+
+
+```{r, warning=FALSE, message = FALSE, include=FALSE}
+
+```
+
+
+
+```{r}
+print_characteristics <- function(x) {
+    print(mean(x, na.rm = TRUE))
+    print(quantile(x, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE))
+    print(var(x, na.rm = TRUE))
+    print(skewness(x, na.rm = TRUE))
+    print(kurtosis(x, na.rm = TRUE))
+}
+```
+
+
+
 Матрица корреляций
 
 ```{r, warning=FALSE, message = FALSE}
 
-data_interesting_logged <- data_interesting_logged %>%
+data_logged <- data_logged %>%
     relocate(TEMPER, AREA, POP92, POP80, POPDEN, INCOME, BORN_F, UNEMP, POVERT, CRIME)
 
 if (interactive()) pdf(file = "cor_matrix.pdf")
-ggplot(melt(cor(data_interesting_logged, method = "pearson", use = "pairwise.complete.obs"))) +
+ggplot(melt(cor(data_logged %>% select(-CITY, -STATE), method = "pearson", use = "pairwise.complete.obs"))) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
     scale_fill_gradient2() +
     theme_dark() +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 if (interactive()) dev.off()
+```
+
+
+
+```{r, warning=FALSE, message = FALSE}
+# data_logged_melt <- melt(data_logged, id = c("POP80", "POP92"))
+
+
+temper_split <- mean(data_logged$TEMPER)
+data_logged$F_TEMPER <- factor(ifelse(data_logged$TEMPER >= temper_split, "hot", "cold"))
+
+if (interactive()) pdf(file = "all_density_groupped_plots.pdf")
+ggplot(
+    melt(data_logged, id = c("CITY", "STATE", "F_TEMPER")),
+    aes(value, color = F_TEMPER)
+) +
+    theme_bw() +
+    # geom_histogram(bins = 15) +
+    geom_density() +
+    facet_wrap(~variable, scales = "free") +
+    geom_line(aes(y = dnorm(value,
+        mean = tapply(value, variable, mean, na.rm = TRUE)[PANEL],
+        sd = tapply(value, variable, sd, na.rm = TRUE)[PANEL]
+    )), color = "black", linetype = 2) +
+    theme(legend.position = "bottom") +
+    labs(x = "", y = "") +
+    scale_color_manual(values = c("blue", "red"))
+if (interactive()) dev.off()
+
+data_logged$F_TEMPER <- NULL
+
+# plot_all_density(data_logged_melt, aes(value, color = F_TEMPER)) +
+#     scale_color_manual(values = c("blue", "red"))
+```
+
+<!-- 
+частные корреляции -->
+
+
+```{r, include=FALSE}
+# ((data_logged %>%
+#     select(-NAME, -PRED_IND, -EXP_IND, -SLOWWAVE, -PARADOX) %>%
+#     mutate(DANG_IND = as.numeric(DANG_IND)) %>%
+#     drop_na() %>%
+#     pcor(method = "spearman"))$estimate %>%
+#     as.data.frame())["SLEEP", "DANG_IND"]
 ```
