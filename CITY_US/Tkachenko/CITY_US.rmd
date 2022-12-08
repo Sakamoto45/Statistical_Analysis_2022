@@ -2,7 +2,9 @@
 title: "CITY_US"
 output:
     html_document:
-        df_print: paged
+        # df_print: paged
+        toc: true
+        toc_float: true 
 ---
 
 
@@ -28,7 +30,7 @@ library(nortest)
 library(entropy)
 ```
 
-Ввод данных
+# Предварительный анализ данных
 
 ```{r}
 if (interactive() && !str_ends(getwd(), "R/Statistical_Analysis_2022/CITY_US/Tkachenko")) {
@@ -41,16 +43,26 @@ data[, -(1:2)] <- data.frame(lapply(data[, -(1:2)], as.numeric))
 fullnames <- names(read_excel("../CITY_US.STD/CITY.xls"))
 ```
 
-Выбираю только инетересные признаки
+## Разобраться в том, что означают признаки.
+
+```{r}
+print(fullnames)
+```
+
+## Отобрать признаки
 
 ```{r}
 names_interesting <- c("AREA", "POP80", "POP92", "POPDEN", "CRIME", "BORN_F", "POVERT", "INCOME", "UNEMP", "TEMPER")
 
-data <- data %>% select(c("CITY", "STATE", names_interesting))
+data <- data %>% select(all_of(c("CITY", "STATE", names_interesting)))
 
 print(head(data))
+
 ```
 
+## Определить вид признаков
+
+Город и штат качественные, остальные количественные, ранги были порядковыми.
 
 PairsPlot
 
@@ -87,7 +99,7 @@ log_asymmetric <- function(x) {
 }
 ```
 
-Автоматически логарифмирую то что имеет ассиметрию  и длинный хвост справа
+Автоматически логарифмирую то что имеет асимметрию  и длинный хвост справа
 
 ```{r}
 data_logged <- data %>%
@@ -186,10 +198,10 @@ ggplot(
 if (interactive()) dev.off()
 ```
 
-Маленькие города выросли, визуально медиана и первая квартиль увеличиись.
+Маленькие города выросли, визуально медиана и первая квартиль увеличились.
 
 Применять t-test нельзя: распределения не нормальные.
-Применить t-test можно: выборка не силишком маленькая (что такое маленькая?).
+Применить t-test можно: выборка не слишком маленькая (что такое маленькая?).
 Применять t-test нельзя: распределения не симметричные.
 
 Поэтому применю и t-test и u-test
