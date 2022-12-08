@@ -28,9 +28,10 @@ library(moments)
 library(qqplotr)
 library(nortest)
 library(entropy)
+library(car)
 ```
 
-# Предварительный анализ данных
+# I Предварительный анализ данных
 
 ```{r}
 if (interactive() && !str_ends(getwd(), "R/Statistical_Analysis_2022/CITY_US/Tkachenko")) {
@@ -43,13 +44,13 @@ data[, -(1:2)] <- data.frame(lapply(data[, -(1:2)], as.numeric))
 fullnames <- names(read_excel("../CITY_US.STD/CITY.xls"))
 ```
 
-## Разобраться в том, что означают признаки.
+## 1 Разобраться в том, что означают признаки.
 
 ```{r}
 print(fullnames)
 ```
 
-## Отобрать признаки
+## 2 Отобрать признаки
 
 ```{r}
 names_interesting <- c("AREA", "POP80", "POP92", "POPDEN", "CRIME", "BORN_F", "POVERT", "INCOME", "UNEMP", "TEMPER")
@@ -57,16 +58,35 @@ names_interesting <- c("AREA", "POP80", "POP92", "POPDEN", "CRIME", "BORN_F", "P
 data <- data %>% select(all_of(c("CITY", "STATE", names_interesting)))
 
 print(head(data))
-
 ```
 
-## Определить вид признаков
+## 3 Определить вид признаков
 
 Город и штат качественные, остальные количественные, ранги были порядковыми.
 
-PairsPlot
 
 ```{r}
+find_mode_freq <- function(x) {
+    x <- x[!is.na(x)]
+    return(max(tabulate(match(x, x))))
+}
+
+print(data %>% summarise(across(
+    all_of(names_interesting),
+    find_mode_freq
+)))
+
+print(sort(data$UNEMP))
+```
+
+Все количественные буду считать непрерывными.
+возможно UNEMP непрерывный с плохой точностью.
+
+## 4 не актуально
+
+## 5 Построить matrix plot
+
+```{r, message=FALSE, warning=FALSE}
 if (interactive()) pdf("ggpairs_unedited.pdf")
 ggpairs(
     data[, -(1:2)],
@@ -76,14 +96,21 @@ ggpairs(
 if (interactive()) dev.off()
 ```
 
+## 7 outliers
+
 Убираю outliers:
 
 Помечаю некорректные данные в INCOME как NA.
-Удаляю город из Аляски.
+Удаляю город из Аляски за плотность населения.
+Флорида выделсется на BORN_F-INCOME
+Гаваи выделяются низким уровнем безработицы. странно?
+
 ```{r}
 data$INCOME[data$INCOME < 100] <- NA
 data <- data %>% filter(STATE != "AK")
 ```
+
+## 6 Несимметричные распределения
 
 Функция, которая логарифмирует, если это сделает выборку симметричнее
 
@@ -106,7 +133,7 @@ data_logged <- data %>%
     mutate(across(all_of(names_interesting), log_asymmetric))
 ```
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 if (interactive()) pdf("ggpairs_logged.pdf")
 ggpairs(
     data_logged[, -(1:2)],
@@ -116,22 +143,43 @@ ggpairs(
 if (interactive()) dev.off()
 ```
 
-все распределения.
-```{r, warning=FALSE, message = FALSE, include=FALSE}
-# plot_all_density <- function(data, mapping = aes(value)) {
-#     ggplot(melt(data, id = c("CITY", "STATE")), mapping) +
-#         theme_bw() +
-#         geom_histogram(aes(y = ..density..), bins = 15) +
-#         # geom_density() +
-#         facet_wrap(~variable, scales = "free") +
-#         geom_line(aes(y = dnorm(value,
-#             mean = tapply(value, variable, mean, na.rm = TRUE)[PANEL],
-#             sd = tapply(value, variable, sd, na.rm = TRUE)[PANEL]
-#         )), color = "black", linetype = 2) +
-#         theme(legend.position = "bottom") +
-#         labs(x = "", y = "")
-# }
+## 8 однородность
 
+выглядит однородно.
+
+
+## 9 не актуально
+
+## 10 всякие характеристики
+
+```{r}
+print_characteristics <- function(x) {
+    list(
+        mean = mean(x, na.rm = TRUE),
+        var = var(x, na.rm = TRUE),
+        skewness = skewness(x, na.rm = TRUE),
+        kurtosis = kurtosis(x, na.rm = TRUE)
+    )
+}
+
+sapply(data_logged %>% select(all_of
+(names_interesting)), print_characteristics)
+```
+
+# II О виде распределений и о сравнении распределений
+
+## 1 выполнить первое второе задание в логичном порядке
+
+## 2 анализ вида распределения признаков
+
+#### 2. Описать распределения признаков визуально (с помощью нормальной бумаги и PP-plot) и по критерию хи-квадрат и другим критериям.
+
+Сюда входит: normal probability plot (что это такое?), проверка по критериям Лиллиефорса, AD, хи-квадрат, Шапиро-Уилка. По критерию хи-квадрат, а также визуально по PP-plot можно проверить и гипотезы о согласии с другими распределениями, например, логнормальным.
+
+Рассматриваем нормальность
+
+все плотности.
+```{r, warning=FALSE, message = FALSE}
 if (interactive()) pdf(file = "all_density_plots.pdf")
 ggplot(melt(data_logged, id = c("CITY", "STATE")), aes(value)) +
     theme_bw() +
@@ -141,23 +189,28 @@ ggplot(melt(data_logged, id = c("CITY", "STATE")), aes(value)) +
     geom_line(aes(y = dnorm(value,
         mean = tapply(value, variable, mean, na.rm = TRUE)[PANEL],
         sd = tapply(value, variable, sd, na.rm = TRUE)[PANEL]
-    )), color = "black", linetype = 2) +
+    )), color = "red") +
     theme(legend.position = "bottom") +
     labs(x = "", y = "")
 if (interactive()) dev.off()
 ```
 
+
+
 Normal probability plot
 
-```{r}
+```{r, warning=FALSE, message = FALSE}
 if (interactive()) pdf(file = "normal_probability_plot.pdf")
 ggplot(melt(data_logged, id = c("CITY", "STATE")), aes(sample = value)) +
     stat_qq_point(size = 2) +
     geom_abline() +
     facet_wrap(~variable, scales = "free")
 if (interactive()) dev.off()
+```
 
+PP-plot
 
+```{r, warning=FALSE, message = FALSE}
 if (interactive()) pdf(file = "PP_plot.pdf")
 ggplot(melt(data_logged, id = c("CITY", "STATE")), aes(sample = value)) +
     stat_pp_point(size = 2) +
@@ -186,72 +239,124 @@ test_all(data_logged[, -(1:2)], pearson.test)
 
 итак, все кроме населения распределено нормально (или логнормально)
 
+#### 1. Описать разницу между численностью населения в 1980 и 1992 годах визуально (с помощью ящиков с усами) и по критериям. Добавить признак, который разбивает города на "холодные" и "жаркие". Сравнить их по характеристикам.
 
-Описать разницу между численностью населения в 1980 и 1992 годах визуально (с помощью ящиков с усами)
+добавим признак
+
+```{r}
+temper_split <- mean(data_logged$TEMPER)
+data_logged$F_TEMPER <- factor(ifelse(data_logged$TEMPER < temper_split, "cold", "hot"))
+```
+
+## 3 Сначала имеет смысл посмотреть на сравнение распределений в группах с помощью ящиков с усами
+
 ```{r}
 if (interactive()) pdf("boxplot_pop.pdf")
 ggplot(
-    melt(data_logged[, c("POP80", "POP92")]),
-    aes(variable, value)
+    melt(data_logged, id.vars = "F_TEMPER", measure.vars = c("POP80", "POP92")),
+    aes(x = variable, y = value, color = F_TEMPER)
 ) +
-    geom_boxplot()
+    geom_boxplot() +
+    scale_color_manual(values = c("blue", "red"))
+if (interactive()) dev.off()
+
+
+if (interactive()) pdf("boxplot_pop_all.pdf")
+ggplot(
+    melt(data_logged, id.vars = "F_TEMPER", measure.vars = c("AREA", "POP80", "POPDEN", "CRIME", "BORN_F", "POVERT", "INCOME", "UNEMP", "TEMPER")),
+    aes(x = variable, y = value, color = F_TEMPER)
+) +
+    geom_boxplot() +
+    facet_wrap(~variable, scales = "free") +
+    scale_color_manual(values = c("blue", "red"))
 if (interactive()) dev.off()
 ```
 
-Маленькие города выросли, визуально медиана и первая квартиль увеличились.
+Население растет, правый ящик с усами выше.
 
-Применять t-test нельзя: распределения не нормальные.
-Применить t-test можно: выборка не слишком маленькая (что такое маленькая?).
-Применять t-test нельзя: распределения не симметричные.
+## 4 начинать нужно с t-критерия...
 
-Поэтому применю и t-test и u-test
-
-Альтернатива односторонняя, потому что для городов естественно расти.
 
 ```{r}
-wilcox.test(data_logged$POP80, data_logged$POP92)
 
-var.test(data_logged$POP80, data_logged$POP92)
+leveneTest(value ~ variable, data = melt(data_logged[c("POP80", "POP92")]), center = "mean")
 
 t.test(
-    (data_logged$POP80 - mean(data_logged$POP80, na.rm = TRUE)) *
-        (data_logged$POP80 - mean(data_logged$POP80, na.rm = TRUE)),
-    (data_logged$POP92 - mean(data_logged$POP92, na.rm = TRUE)) *
-        (data_logged$POP92 - mean(data_logged$POP92, na.rm = TRUE))
+    data_logged$POP80,
+    data_logged$POP92,
+    var.equal = TRUE,
+    paired = TRUE
 )
-
-# t.test(data_logged$POP80, data_logged$POP92, alternative = "less")
 ```
+Мы не доверяем критерию фишера потому что он работает только для нормальных.
+применим тест левена, он не отвергает гипотезу что дисперсии равны, как и ожидалось для почти одинаковых распредлений.
+считаем что дисперсии равны и применяем t-test.
 
-
-```{r, warning=FALSE, message = FALSE, include=FALSE}
-
-```
-
-
+## 5 если бы выборка было маленькая или дисперсии были неравны, пришлось бы применять непараметрический t-test Вилксона.
 
 ```{r}
-print_characteristics <- function(x) {
-    print(mean(x, na.rm = TRUE))
-    print(quantile(x, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE))
-    print(var(x, na.rm = TRUE))
-    print(skewness(x, na.rm = TRUE))
-    print(kurtosis(x, na.rm = TRUE))
-}
+wilcox.test(data_logged$POP80, data_logged$POP92, paired = TRUE)
 ```
 
+## 6 Смотрите на результаты применения критерия Манна-Уитни
 
+Манна-Уитни = Вилксона, этому тесту не нужны дополонительные требования, но он менее мощен чем t-test.
 
-Матрица корреляций
+## 7 критерий Колмогорова-Смирнова
+
+еще есть тест колмогорова смирнова, который сравнивает распеределения.
+```{r}
+ks.test(data_logged$POP80, data_logged$POP92)
+```
+
+он не отвергает.
+
+## 8 сравнение зависимых выборок 
+
+это все и было сравнение зависимых выборок
+
+из-за того что тесты парные, они смогли отвергнуть гипотезы о том, что средние равны, без этого гипотезы не отвеграются.
+статистика зависимого критерия больше статистики независимого (при положительной корреляции), поэтому мощнее.
+
+# 3 Об анализе зависимостей
+
+## 1 вспомним pairs plot
+
+```{r, message=FALSE, warning=FALSE}
+if (interactive()) pdf("ggpairs_logged.pdf")
+ggpairs(
+    data_logged[, -(1:2)],
+    lower = list(continuous = wrap("points", alpha = 0.5, size = 0.3)),
+    diag = list(continuous = "barDiag")
+)
+if (interactive()) dev.off()
+```
+
+```{r, message=FALSE, warning=FALSE}
+if (interactive()) pdf("ggpairs_logged_colored.pdf")
+ggpairs(
+    data_logged[, -(1:2)],
+    aes(color = F_TEMPER),
+    lower = list(continuous = wrap("points", alpha = 0.5, size = 0.6)),
+    diag = list(continuous = "barDiag"),
+    columns = names_interesting
+) +
+    scale_color_manual(values = c("blue", "red")) +
+    scale_fill_manual(values = c("blue", "red"))
+if (interactive()) dev.off()
+```
+
+Матрица корреляций пирсона
 
 ```{r, warning=FALSE, message = FALSE}
-
 data_logged <- data_logged %>%
-    relocate(TEMPER, AREA, POP92, POP80, POPDEN, INCOME, BORN_F, UNEMP, POVERT, CRIME)
+    relocate(TEMPER, AREA, POP92, POP80, POPDEN, BORN_F, UNEMP, POVERT, CRIME, INCOME)
 
-if (interactive()) pdf(file = "cor_matrix.pdf")
-ggplot(melt(cor(data_logged %>% select(-CITY, -STATE), method = "pearson", use = "pairwise.complete.obs"))) +
+
+if (interactive()) pdf(file = "cor_matrix_pearson.pdf")
+ggplot(melt(cor(data_logged %>% select(-CITY, -STATE, -F_TEMPER), method = "pearson", use = "pairwise.complete.obs"))) +
     geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    geom_text(aes(x = Var2, y = Var1, label = round(value, 2))) +
     scale_fill_gradient2() +
     theme_dark() +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
@@ -259,14 +364,21 @@ if (interactive()) dev.off()
 ```
 
 
+Матрица корреляций спирмана
 
 ```{r, warning=FALSE, message = FALSE}
-# data_logged_melt <- melt(data_logged, id = c("POP80", "POP92"))
+if (interactive()) pdf(file = "cor_matrix_spearman.pdf")
+ggplot(melt(cor(data_logged %>% select(-CITY, -STATE, -F_TEMPER), method = "spearman", use = "pairwise.complete.obs"))) +
+    geom_raster(aes(x = Var2, y = Var1, fill = value)) +
+    geom_text(aes(x = Var2, y = Var1, label = round(value, 2))) +
+    scale_fill_gradient2() +
+    theme_dark() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+if (interactive()) dev.off()
+```
 
 
-temper_split <- mean(data_logged$TEMPER)
-data_logged$F_TEMPER <- factor(ifelse(data_logged$TEMPER >= temper_split, "hot", "cold"))
-
+```{r, warning=FALSE, message = FALSE}
 if (interactive()) pdf(file = "all_density_groupped_plots.pdf")
 ggplot(
     melt(data_logged, id = c("CITY", "STATE", "F_TEMPER")),
@@ -302,4 +414,9 @@ data_logged$F_TEMPER <- NULL
 #     drop_na() %>%
 #     pcor(method = "spearman"))$estimate %>%
 #     as.data.frame())["SLEEP", "DANG_IND"]
+```
+
+```{r}
+cor(data_logged$POP80, data_logged$POP92, method = "pearson")
+cor(data_logged$POP80, data_logged$POP92, method = "spearman")
 ```
