@@ -19,7 +19,6 @@ library(reshape2)
 library(ggplot2)
 library(GGally)
 library(stringr)
-library(dplyr)
 library(correlation) # cor_sort
 library(forcats)
 library(tidyr)
@@ -29,6 +28,8 @@ library(qqplotr)
 library(nortest)
 library(entropy)
 library(car)
+library(ppcor)
+library(dplyr)
 ```
 
 # I Предварительный анализ данных
@@ -403,9 +404,18 @@ data_logged$F_TEMPER <- NULL
 #     scale_color_manual(values = c("blue", "red"))
 ```
 
-<!-- 
-частные корреляции -->
 
+###частные корреляции
+
+Вычитаю из иностранных и плотности доход
+
+```{r}
+(data_logged %>%
+    dplyr::select(BORN_F, POPDEN, INCOME) %>%
+    drop_na() %>%
+    pcor(method = "pearson"))$estimate["BORN_F", "POPDEN"]
+```
+Частная корреляция иностранно рожденных и плотности населения за вычетом дохода больше чем обычная корреляция.
 
 ```{r, include=FALSE}
 # ((data_logged %>%
@@ -417,6 +427,18 @@ data_logged$F_TEMPER <- NULL
 ```
 
 ```{r}
-cor(data_logged$POP80, data_logged$POP92, method = "pearson")
-cor(data_logged$POP80, data_logged$POP92, method = "spearman")
+# cor(data_logged$POP80, data_logged$POP92, method = "pearson")
+# cor(data_logged$POP80, data_logged$POP92, method = "spearman")
 ```
+
+
+
+написать выводы
+
+
+
+
+
+
+доходы , преступления, преступность, бедность
+
