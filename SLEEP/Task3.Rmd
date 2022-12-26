@@ -1,11 +1,17 @@
 ---
 title: "Task3"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
 date: "2022-11-11"
 ---
 
-Прочитаем и обработаем данные. Среди данных не может быть отрицательных значений, 
-NA обозначаются как -999.
+
+# Предварительный анализ данных. 
+1\. Описание признаков присутствует в сопроводительном файле. Прочитаем данные. 
+Среди данных не может быть отрицательных значений, NA обозначаются как -999.
+
 ```{r, message=FALSE, warning=FALSE}
 library(readxl)
 library(dplyr)
@@ -17,9 +23,62 @@ df <- read_excel("Sleep/SLEEP_shortname.xls")
 df[df < 0] <- NA
 
 head(df)
-length(df$NAME)
 ```
-Посмотрим на данные.
+
+Количество строк в таблице.
+
+```{r}
+nrow(df)
+```
+
+2\. Признаков немного, поэтому рассматривать будем все.
+
+3\. Кроме индексов-факторов, все признаки количественные. Индексы - порядковые признаки.
+Все количественные признаки непрерывные, но можно заметить дискретизацию при округлении.
+Проверим это, посмотрев на частоты мод и повторов.
+
+```{r}
+mode_rate <- function(x) {
+  x <- x[!is.na(x)]
+  u <- unique(x)
+  tab <- tabulate(match(x, u))
+  max(tab) / length(x)
+}
+
+repeat_rate <- function(x) {
+  x <- x[!is.na(x)]
+  u <- unique(x)
+  (length(x) - length(u)) / length(x)
+}
+```
+
+Отношение частоты моды к числу элементов.
+
+```{r}
+df %>% summarise(BODY_WEI = round(mode_rate(BODY_WEI), 3), BRAIN_WE = round(mode_rate(BRAIN_WE), 3), 
+                SLOWWAVE = round(mode_rate(SLOWWAVE), 3), PARADOX = round(mode_rate(PARADOX), 3), 
+                SLEEP = round(mode_rate(SLEEP), 3), LIFESPAN = round(mode_rate(LIFESPAN), 3), 
+                GESTTIME = round(mode_rate(GESTTIME), 3))
+```
+
+Отношение частоты повторных элементов к числу элементов.
+
+```{r}
+df %>% summarise(BODY_WEI = round(repeat_rate(BODY_WEI), 3), BRAIN_WE = round(repeat_rate(BRAIN_WE), 3), 
+                SLOWWAVE = round(repeat_rate(SLOWWAVE), 3), PARADOX = round(repeat_rate(PARADOX), 3), 
+                SLEEP = round(repeat_rate(SLEEP), 3), LIFESPAN = round(repeat_rate(LIFESPAN), 3), 
+                GESTTIME = round(repeat_rate(GESTTIME), 3))
+```
+
+Будем считать данные дискретными, если отношение частоты моды к числу элементов 
+больше 10%, а отношение частоты повторных элементов к числу элементов больше 15%.
+Тогда BODY_WEI, BRAIN_WE будут непрерывными, а BRAIN_WE, PARADOX, SLEEP, LIFESPAN, 
+GESTTIME дискретными.
+
+4\. Не актуально для текущих данных.
+
+5\. Посмотрим на данные.
+
 ```{r, message=FALSE, warning=FALSE}
 library(ggplot2)
 library(GGally)
@@ -28,36 +87,435 @@ library(GGally)
 ```{r, message=FALSE, warning=FALSE}
 df %>% dplyr::select(-NAME) %>%
   ggpairs(diag=list(continuous = "barDiag"), 
-          columns = c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+          columns = c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
 ```
-Преобразуем данные. Переведем вес животного в граммы, продолжительность жизни в
-дни. Логарифмируем данные, чтобы было легче наблюдать корреляции (выше заметны 
-сильно отличающиеся индивиды, это слоны). Факторизуем индексы.
+
+6\. Преобразуем данные. Логарифмируем данные, чтобы было легче наблюдать корреляции 
+(выше заметны сильно отличающиеся индивиды, это слоны) и получить нормыльные 
+распределения признаков. Факторизуем индексы.
+
 ```{r}
 dfNew <- df %>% mutate(PRED_IND = as.factor(PRED_IND), EXP_IND = as.factor(EXP_IND),
                    DANG_IND = as.factor(DANG_IND), 
-                   BODY_WEI = log(BODY_WEI * 1000), BRAIN_WE = log(BRAIN_WE), 
-                   LIFESPAN = log(LIFESPAN * 365.25), GESTTIME = log(GESTTIME))
+                   BODY_WEI = log(BODY_WEI), BRAIN_WE = log(BRAIN_WE), 
+                   LIFESPAN = log(LIFESPAN), GESTTIME = log(GESTTIME))
 ```
-Посмотрим на новые данные. Сгруппируем индивидов по факторам. 
+
+Посмотрим на новые данные. Сгруппируем индивидов по факторам.
+
+## {.tabset .unlisted .unnumbered}
+
+### No factorization
+
 ```{r, message=FALSE, warning=FALSE}
 dfNew %>% dplyr::select(-NAME) %>%
   ggpairs(diag=list(continuous = "barDiag"), 
-          columns = c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+          columns = c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+
+### PRED_IND
+
+```{r, message=FALSE, warning=FALSE}
 dfNew %>% dplyr::select(-NAME) %>%
   ggpairs(diag=list(continuous = "barDiag"), aes(colour=PRED_IND), legend=1,
-          columns=c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+          columns=c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+
+### EXP_IND
+
+```{r, message=FALSE, warning=FALSE}
 dfNew %>% dplyr::select(-NAME) %>%
   ggpairs(diag=list(continuous = "barDiag"), aes(colour=EXP_IND), legend=1,
-          columns=c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+          columns=c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+
+### DANG_IND
+
+```{r, message=FALSE, warning=FALSE}
 dfNew %>% dplyr::select(-NAME) %>%
   ggpairs(diag=list(continuous = "barDiag"), aes(colour=DANG_IND), legend=1,
-          columns=c("BODY_WEI", "BRAIN_WE", "SLEEP", "LIFESPAN", "GESTTIME"))
+          columns=c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
 ```
-Посмотрим на корреляции между признаками.
+
+## {.unlisted .unnumbered}
+
+7\. Аутлайнеров нет.
+
+8\. Неоднородности нет.
+
+9\. Не актуально для текущих данных.
+
+10\. Используем описательные статистики для распределений признаков в новой выборке.
+
+```{r}
+library(moments)
+```
+
+```{r}
+characteristics <- function(x) {
+  c(mean = round(mean(x, na.rm = TRUE), 3),
+    median = round(median(x, na.rm = TRUE), 3),
+    var = round(var(x, na.rm = TRUE), 3),
+    skewness = round(skewness(x, na.rm = TRUE), 3),
+    kurtosis = round(kurtosis(x, na.rm = TRUE) - 3, 3))
+}
+
+data.frame(lapply(as.list(dfNew[2:8]), characteristics)) %>% t()
+```
+
+# О виде распределений и о сравнении распределений.
+## Индивидуальное задание 2.
+1\. Проверим распределения признаков на нормальность.
+
 ```{r, warning=FALSE, message = FALSE}
 library(reshape)
 ```
+
+Изобразим гистограммы признаков на фоне плотности нормального распределения.
+
+```{r, warning=FALSE, message = FALSE}
+dfMelt <- dfNew %>% 
+  dplyr::select(-PRED_IND, -DANG_IND) %>% 
+  as.data.frame(dfNew) %>% 
+  melt(id.vars = c("NAME", "EXP_IND"))
+
+ggplot(dfMelt, aes(x = value)) +
+        geom_histogram(aes(y = ..density..)) +
+        facet_wrap(~variable, scales = "free") +
+        labs(x = "", y = "") +
+        geom_line(aes(y = dnorm(value,
+                      mean = tapply(value, variable, mean, na.rm = TRUE)[PANEL],
+                      sd = tapply(value, variable, sd, na.rm = TRUE)[PANEL]
+                      )), color = "blue")
+```
+
+Изобразим выборочную функцию распредления признаков на фоне функции 
+распределения нормального распределения.
+```{r, warning=FALSE, message = FALSE}
+ggplot(dfMelt, aes(x = value)) +
+        stat_ecdf() +
+        facet_wrap(~variable, scales = "free") +
+        labs(x = "", y = "") +
+        geom_line(aes(y = pnorm(value,
+                      mean = tapply(value, variable, mean, na.rm = TRUE)[PANEL],
+                      sd = tapply(value, variable, sd, na.rm = TRUE)[PANEL]
+                      )), color = "blue")
+```
+
+Давайте еще нарисуем PP-plot и QQ-plot.
+
+```{r, warning=FALSE, message = FALSE}
+library(qqplotr) 
+```
+
+```{r, warning=FALSE, message = FALSE}
+ggplot(dfMelt, aes(sample = value)) +
+        stat_pp_point(size = 1) +
+        facet_wrap(~variable, scales = "free") +
+        labs(x = "", y = "") +
+        stat_pp_line(color = "blue")
+```
+
+```{r, warning=FALSE, message = FALSE}
+ggplot(dfMelt, aes(sample = value)) +
+        stat_qq_point(size = 1) +
+        facet_wrap(~variable, scales = "free") +
+        labs(x = "", y = "") +
+        stat_qq_line(color = "blue")
+```
+
+2\. Похоже, что нормальность имеет место. Проверим это с помощью критериев.
+
+```{r}
+library(nortest)
+```
+
+Критерий Пирсона для абсолютно непрерывных распределений делит распределение 
+на состояния, чтобы сделать его дискретным.
+Критерий Лиллиефорса - это модификация критерия Колмогорова-Смирнова для проверки
+сложных гипотез.
+Критерий Андерона-Дарлинга - это один из критериев типа w^2.
+Критерий Шапира-Уилка - примерно квадрат корреляции между x и y в n.p.p.
+
+```{r}
+normality.tests <- function(x) {
+  c(Pearson = round(pearson.test(x)$p, 5),
+    Lilliefors = round(lillie.test(x)$p, 5),
+    Anderson.Darling = round(ad.test(x)$p, 5),
+    Shapiro.Wilk = round(shapiro.test(x)$p, 5))
+}
+
+data.frame(lapply(as.list(dfNew[2:8]), normality.tests)) %>% t()
+```
+
+Гипотеза о нормальности распределения для быстрого сна отвергается многими 
+критериями с уровнем значисости 0.05. Гипотеза нормльности распределения для 
+веса животного отвергается критерием Лиллиефорса с уровнем значисости 0.05. 
+Остальные критерии гипотезы не отвергли с уровнем значисости 0.05.
+
+## Индивидуальное задание 1. 
+3\. Опишем разницу между животными по степени опасности места, где они спят.
+
+## {.tabset .unlisted .unnumbered}
+
+### BODY_WEI
+
+```{r, warning=FALSE, message = FALSE}
+dfNew %>% ggplot(aes(y=BODY_WEI, colour=EXP_IND)) + geom_boxplot()
+```
+
+### BRAIN_WE
+
+```{r, warning=FALSE, message = FALSE}
+dfNew %>% ggplot(aes(y=BRAIN_WE, colour=EXP_IND)) + geom_boxplot()
+```
+
+### SLOWWAVE
+
+```{r, warning=FALSE, message = FALSE}
+dfNew %>% ggplot(aes(y=SLOWWAVE, colour=EXP_IND)) + geom_boxplot()
+```
+
+### PARADOX
+
+```{r, warning=FALSE, message = FALSE}
+dfNew %>% ggplot(aes(y=PARADOX, colour=EXP_IND)) + geom_boxplot()
+```
+
+### SLEEP
+
+```{r, warning=FALSE, message = FALSE}
+dfNew %>% ggplot(aes(y=SLEEP, colour=EXP_IND)) + geom_boxplot()
+```
+
+### LIFESPAN
+
+```{r, warning=FALSE, message = FALSE}
+dfNew %>% ggplot(aes(y=LIFESPAN, colour=EXP_IND)) + geom_boxplot()
+```
+
+### GESTTIME
+
+```{r, warning=FALSE, message = FALSE}
+dfNew %>% ggplot(aes(y=GESTTIME, colour=EXP_IND)) + geom_boxplot()
+```
+
+## {.unlisted .unnumbered}
+
+Можно заметить, что животные, живущие в более защищенных местах, 1,2) имеют меньший
+вес тела и мозга; 3,4,5) чаще дольше спят в общем и в разных фазах сна по отдельности;
+6,7) имеют менее длительные продолжительность жизни и период вынашивания потомства. 
+
+Давайте проверим наблюдения 1,3) c помощью критериев для животных, живущих
+в ниболее и в наименее защищенных местах.
+
+```{r}
+dfNew1 <- dplyr::filter(dfNew, EXP_IND == 1)
+dfNew5 <- dplyr::filter(dfNew, EXP_IND == 5)
+```
+
+Размер групп:
+
+```{r}
+c(nrow(dfNew1), nrow(dfNew5))
+```
+
+Ранее мы узнали, что многие признаки распределены нормально, но сейчас мы будем 
+сравнивать разные группы индивидов, признаки внутри которых могут уже не имеют 
+нормальность. Проверим это, сначала графически.
+
+```{r, warning=FALSE, message = FALSE}
+ggplot(dfNew1, aes(sample = BODY_WEI)) +
+        stat_qq_point(size = 1) +
+        labs(x = "", y = "") +
+        stat_qq_line(color = "blue")
+ggplot(dfNew1, aes(sample = SLEEP)) +
+        stat_qq_point(size = 1) +
+        labs(x = "", y = "") +
+        stat_qq_line(color = "blue")
+
+ggplot(dfNew5, aes(sample = BODY_WEI)) +
+        stat_qq_point(size = 1) +
+        labs(x = "", y = "") +
+        stat_qq_line(color = "blue")
+ggplot(dfNew5, aes(sample = SLEEP)) +
+        stat_qq_point(size = 1) +
+        labs(x = "", y = "") +
+        stat_qq_line(color = "blue")
+```
+
+Тпереь используем те же критерии, что использовали ранее.
+
+Вес тела для животных, спящих в более защищенном месте.
+
+```{r}
+normality.tests(dfNew1$BODY_WEI)
+```
+
+Сон для животных, спящих в более защищенном месте.
+
+```{r}
+normality.tests(dfNew1$SLEEP)
+```
+
+Вес тела для животных, спящих в менее защищенном месте.
+
+```{r}
+normality.tests(dfNew5$BODY_WEI)
+```
+
+Сон для животных, спящих в менее защищенном месте.
+
+```{r}
+normality.tests(dfNew5$SLEEP)
+```
+
+Нормальность отверглась с уровням значимости 0.05 толко для сная животных, 
+спящих в менее защищенном месте. Причем по всем критериям отверглась. 
+
+Итак. Группы у нас независимые и некоторые из них имеют нормальное распределение.
+
+4\. Сравним распределения с помощью t-критериев для независимых выборок. Но
+сначала проверим гипотезу о равенстве дисперсий распределений.
+
+Для веса тела можно использовать критерий Фишера, а для сна нельзя, так как для сна 
+не выполняется нормальность, поэтому ему доверять не будем, но проведем ради 
+академического интереса. Также используем критерий Левена с модулями.
+
+```{r}
+var.tests <- function(x, y) {
+  c(Fisher = round(var.test(x, y)$p.value, 5),
+    Levene = round(t.test(abs(x - mean(x, na.rm = TRUE)), 
+                          abs(y - mean(y, na.rm = TRUE)))$p.value, 5))
+}
+```
+
+Вес тела.
+
+```{r}
+var.tests(dfNew1$BODY_WEI, dfNew5$BODY_WEI)
+```
+
+Сон.
+
+```{r}
+var.tests(dfNew1$SLEEP, dfNew5$SLEEP)
+```
+
+Гипотеза о равных дисперсиях не отверглась для веса, а для сна отверглась с 
+уровнем значимости 0.05.
+
+Посмотрим на t-критерии с равными и неравными дисперсиями для независимых выборок.
+
+```{r}
+t.tests <- function(x, y) {
+  c(Two.sample.t.test = t.test(x, y, var.equal=TRUE)$p.value,
+    Welch.two.sample.t.test = t.test(x, y, var.equal=FALSE)$p.value)
+}
+```
+
+Вес тела.
+
+```{r}
+t.tests(dfNew1$BODY_WEI, dfNew5$BODY_WEI)
+```
+
+Первый критерий точный, второй ассимптотический 
+
+Сон.
+
+```{r}
+t.tests(dfNew1$SLEEP, dfNew5$SLEEP)
+```
+
+Первый критерий исользуется не по назначению (так как дисперсии разные), второй
+ассимптотический. Как и предполагалось отверглись гипотезы в 
+пользу того, что мы наблюдали на box-plot-ах выше.
+
+5,6\. Так как в случае сна удалось проверить гипотезу только асимптотическим критерием,
+а выборки у нас небольшие, воспользуемся другими критериями. Выбросов у нас нет,
+но все же используем критерий Уилкоксона, так как он является точным критерием
+(хотя у нас все равно есть повторения в выборках и критерий будет считаться приближенно).
+
+Вес.
+
+```{r, warning=FALSE, message = FALSE}
+wilcox.test(dfNew1$BODY_WEI, dfNew5$BODY_WEI, paired=FALSE)$p.value
+```
+
+Сон.
+
+```{r, warning=FALSE, message = FALSE}
+wilcox.test(dfNew1$SLEEP, dfNew5$SLEEP, paired=FALSE)$p.value
+```
+
+Мощность у этого критерия меньшая чем у t-критериев, но гипотезы так же отверглись.
+
+7\. Наконец используем двухвыборочный критерий Колмогорова-Смирнова, который имеет 
+меньшую мощность, но у которого более общая альтернативная гипотеза.
+
+Вес.
+
+```{r, warning=FALSE, message = FALSE}
+ks.test(dfNew1$BODY_WEI, dfNew5$BODY_WEI)$p.value
+```
+
+Сон.
+
+```{r, warning=FALSE, message = FALSE}
+ks.test(dfNew1$SLEEP, dfNew5$SLEEP)$p.value
+```
+
+Гипотезы так же отверглись.
+
+8\. Не актуально для текущих данных.
+
+# Об анализе зависимостей.
+## Индивидуальное задание 3.
+1\. Посмотрим еще раз на ggpairs plot.
+
+## {.tabset .unlisted .unnumbered}
+
+### No factorization
+
+```{r, message=FALSE, warning=FALSE}
+dfNew %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), 
+          columns = c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+
+### PRED_IND
+
+```{r, message=FALSE, warning=FALSE}
+dfNew %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), aes(colour=PRED_IND), legend=1,
+          columns=c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+
+### EXP_IND
+
+```{r, message=FALSE, warning=FALSE}
+dfNew %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), aes(colour=EXP_IND), legend=1,
+          columns=c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+
+### DANG_IND
+
+```{r, message=FALSE, warning=FALSE}
+dfNew %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), aes(colour=DANG_IND), legend=1,
+          columns=c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+
+## {.unlisted .unnumbered}
+
+Можно заметить 1) положительную корреляцию веса тела, веса мозга, продолжительности
+жизни и периода вынашивания потомства; 2) положительную корреляцию фаз 
+сна и сна в общем смысле; 3) отрицательную корреляцию всего, что было перечислено
+в пункте 1), со всем, что было перечислено в пункте 2).
+
+2\. Посмотрим на корреляцию Пирсона между признаками.
 
 ```{r, warning=FALSE, message = FALSE}
 dplyr::select(dfNew, -NAME) %>%
@@ -70,7 +528,16 @@ ggplot(aes(X1, X2)) +
   scale_fill_gradient2(low=colors()[555], mid=colors()[1], high=colors()[26]) + 
   ggtitle("dfNew pearson") +
   theme(axis.text.x = element_text(angle = 50, hjust = 1))
+```
 
+Видим подтверждение того, что наблюдали на ggpairs, еще заметны отрицательные 
+корреляции индексов и сна. То есть, например, чем в большей опасности находится животное, 
+тем меньше оно спит. Еще заметна сильная корреляция между размерами животного и
+незащищенностью места, где оно спит.
+
+3\. Теперь посмотрим на корреляции Спирмана между признаками.
+
+```{r, warning=FALSE, message = FALSE}
 dplyr::select(dfNew, -NAME) %>%
 mutate(PRED_IND = as.numeric(PRED_IND), EXP_IND = as.numeric(EXP_IND), DANG_IND = as.numeric(DANG_IND)) %>%
 cor(method = "spearman", use = "pairwise.complete.obs") %>%
@@ -81,9 +548,51 @@ ggplot(aes(X1, X2)) +
   scale_fill_gradient2(low=colors()[555], mid=colors()[1], high=colors()[26]) + 
   ggtitle("dfNew spearman") +
   theme(axis.text.x = element_text(angle = 50, hjust = 1))
-  
 ```
 
+Больших изменений нет (так как у нас нет выбросов и распределения близкие к 
+нормальным). 
 
+4\. Также посчитаем интересные частные корреляции. 
 
+```{r, warning=FALSE, message = FALSE}
+library(ppcor)
+```
 
+Посмотрим на частную корреляцию веса животного и сна за вычетом идексов 
+опасности и на частную корреляцию степени защищенности животного во время сна и 
+сна за вычетом веса и связанных с ним критериев. Тем самы мы проверим,
+не явлется ли индекс опасности скрытым фактором, вызывающим отрицательную 
+корреляцию между весом и сном. Также проверим, не является ли вес скрытым фактором, 
+вызывающим отрицательную корреляцию между фактором опасности и сном.
+
+Это будет иметь смысл, так как между индексами, весом и сном коэффициент Пирсона 
+значим, то есть есть линейная зависимость между индексами, весом и сном, которая
+будет вычитаться при подсчете частных корреляций. 
+
+Частая корреляция веса животного и сна за вычетом идексов опасности.
+
+```{r, warning=FALSE, message = FALSE}
+((dplyr::select(dfNew, -NAME, -BRAIN_WE, -LIFESPAN, -GESTTIME, -SLOWWAVE, -PARADOX) %>%
+  mutate(PRED_IND = as.numeric(PRED_IND), EXP_IND = as.numeric(EXP_IND), DANG_IND = as.numeric(DANG_IND)) %>%
+  drop_na() %>%
+  pcor(method = "spearman"))$estimate %>%
+as.data.frame())["SLEEP", "BODY_WEI"]
+```
+
+Отрицательная корреляции между сном и весом животного остается. Животные с 
+большим весом спят меньше.
+
+Часнтая корреляция степени защищенности животного во время сна  и 
+сна за вычетом веса и связанных с ним критериев.
+
+```{r, warning=FALSE, message = FALSE}
+((dplyr::select(dfNew, -NAME, -PRED_IND, -DANG_IND, -SLOWWAVE, -PARADOX) %>%
+  mutate(EXP_IND = as.numeric(EXP_IND)) %>%
+  drop_na() %>%
+  pcor(method = "spearman"))$estimate %>% 
+as.data.frame())["SLEEP", "EXP_IND"]
+```
+
+Отрицательная корреляция между сном и индексом защищенности животного во время сна
+остается. Животные, находящиеся в большей опасности во время сна, спят меньше.
