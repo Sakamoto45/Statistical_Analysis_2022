@@ -1,0 +1,139 @@
+---
+title: "task1"
+output: html_document
+date: "2023-03-13"
+---
+
+```{r, message=FALSE}
+library(readxl)
+library(dplyr)
+```
+
+```{r, message=FALSE}
+df <- read_xls("PRESTIGE (1).xls")
+head(df)
+```
+
+```{r, message=FALSE}
+library(ggplot2)
+library(GGally)
+```
+
+Посмотрим на данные.
+```{r, message=FALSE}
+df %>% select(PRESTIGE, SUICIDE, INCOME, SCHOOL) %>% 
+  ggpairs(diag=list(continuous = "barDiag"))
+```
+
+```{r, message=FALSE, include=FALSE}
+df %>% select(PRESTIGE, SUICIDE, INCOME, SCHOOL) %>% 
+  mutate(INCOME = log(INCOME)) %>%
+  ggpairs(diag=list(continuous = "barDiag"))
+```
+
+1. Построим линейную регрессионную модель. Хотим узнать как престиж, доходы и 
+образованность влияют на суицидальность.
+```{r}
+model = lm(SUICIDE~PRESTIGE+INCOME+SCHOOL, data=df)
+summary(model)
+```
+
+Столбец Estimate демонстрирует, что чем ниже уровень образования, тем выше 
+суицидальность, остальные два признака кажутся незначимыми. Столбец Pr(>|t|) 
+отражает p-value проверки гипотезы незначивомисти признаков в модели. С увровнем
+значимости 0.5 только SCHOOL значим.
+
+F-statistic p-value меньше 0.5, модель значима.
+
+Теперь стандартизируем коэффициенты регрессии.
+```{r, message=FALSE}
+library(lm.beta)
+```
+
+```{r}
+model.st <- lm.beta(model)
+summary(model.st)
+```
+
+Появляется новый столбец Standardized.
+
+
+2. Посмотрим на корреляционную матрицу между коэффициентами модели. 
+```{r}
+vcov(model)
+cov2cor(vcov(model))
+```
+
+(Как строить эллипс?)
+```{r, include=FALSE}
+# library(plotrix)
+# plot(c(-5,5), c(-5,5), type="n", main="test draw.ellipse")
+# draw.ellipse(x=0, y=0, a = 1, b = 1, angle = 0)
+```
+
+
+3. Попробуем в ручную уменьшить число признаков, исходя из изученных характеристик.
+
+Вычислим Tolerance.
+[R - множественный коэффициент корреляции;
+Tolerance = 1 + R^2;
+VIF = 1 / (1 + R^2) = 1 / Tolerance.]
+```{r, message=FALSE}
+library(olsrr)
+```
+
+```{r}
+ols_vif_tol(model)
+```
+Меньшее значние Tolerance у престижности професии.
+
+Вычислим частные корреляции.
+[Zero Order - корреляция Пирсона между зависимым и независимым признаком;
+Partial - частная корреляци между;
+Part - получастная корреляция.]
+```{r}
+ols_correlations(model)
+```
+
+Большая частная корреляция у SCHOOL, т.е. менее предпочтительно ее исключать.
+
+Удалим PRESTIGE из модели
+```{r}
+model.p = lm(SUICIDE~INCOME+SCHOOL, data=df)
+model.st.p <- lm.beta(model.p)
+summary(model.st.p)
+```
+
+Ранее было (с всеми признаками):
+Residual standard error: 10.37 on 32 degrees of freedom
+Multiple R-squared:  0.2995,	Adjusted R-squared:  0.2339 
+F-statistic: 4.562 on 3 and 32 DF,  p-value: 0.009039
+```{r}
+cov2cor(vcov(model.p))
+```
+
+Модель все еще значима.
+```{r}
+ols_vif_tol(model.p)
+# ols_correlations(model.p)
+```
+
+Удалим INCOME из модели.
+```{r}
+model.p.i = lm(SUICIDE~INCOME, data=df)
+model.st.p.i <- lm.beta(model.p.i)
+summary(model.st.p.i)
+```
+
+Ранее было (с двумя признаками):
+Residual standard error: 10.37 on 32 degrees of freedom
+Multiple R-squared:  0.2995,	Adjusted R-squared:  0.2339 
+F-statistic: 4.562 on 3 and 32 DF,  p-value: 0.009039
+
+Ранее было (с всеми признаками):
+Residual standard error: 10.58 on 33 degrees of freedom
+Multiple R-squared:  0.2479,	Adjusted R-squared:  0.2023 
+F-statistic: 5.439 on 2 and 33 DF,  p-value: 0.009085
+
+Такая модель незначима. Следовательно, рекомендуемая модель при зависимом признаке 
+SUICIDE включает в себя независиммые признаки SCHOOL и INCOME.

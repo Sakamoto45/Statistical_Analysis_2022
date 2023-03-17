@@ -1,0 +1,15 @@
+/* 490 */, p. 395. prestige.dat
+Prestige, income, education and suicide rates for 36 occupations (1950)
+
+Labovitz, S. (1970) The assignment of numbers to rank order categories.
+American Sociological Review, 35, p.515-524, Table 1.
+
+The sourse paper was concerned with the effect of treating ordinal
+scales as intervals.
+
+Variables
+OCCUPATION - occupation (no)
+PRESTIGE   - the NORC occupational prestige rating
+SUICIDE    - the male suicide rate (amongst males aged 20-64)
+INCOME     - the median income ($)
+SCHOOL     - the median number of school years completed
