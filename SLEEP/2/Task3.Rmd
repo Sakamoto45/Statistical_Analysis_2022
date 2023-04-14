@@ -1,0 +1,461 @@
+---
+title: "Task3"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+date: "2022-11-11"
+---
+
+
+# Предварительный анализ данных. 
+Описание признаков присутствует в сопроводительном файле. Прочитаем данные. 
+Среди данных не может быть отрицательных значений, NA обозначаются как -999.
+
+```{r, message=FALSE, warning=FALSE}
+library(readxl)
+library(dplyr)
+library(tidyr)
+```
+
+```{r, message=FALSE, warning=FALSE}
+df <- read_excel("Sleep/SLEEP_shortname.xls")
+df[df < 0] <- NA
+
+head(df)
+```
+
+Признаков немного, поэтому рассматривать будем все.
+
+Кроме индексов-факторов, все признаки количественные. Индексы - порядковые признаки.
+Все количественные признаки непрерывные, но можно заметить дискретизацию при округлении.
+Проверим это, посмотрев на частоты мод
+
+```{r}
+mode_rate <- function(x) {
+  x <- x[!is.na(x)]
+  u <- unique(x)
+  tab <- tabulate(match(x, u))
+  max(tab) / length(x)
+}
+```
+
+Отношение частоты моды к числу элементов.
+```{r}
+df %>% summarise(BODY_WEI = round(mode_rate(BODY_WEI), 3), BRAIN_WE = round(mode_rate(BRAIN_WE), 3), 
+                SLOWWAVE = round(mode_rate(SLOWWAVE), 3), PARADOX = round(mode_rate(PARADOX), 3), 
+                SLEEP = round(mode_rate(SLEEP), 3), LIFESPAN = round(mode_rate(LIFESPAN), 3), 
+                GESTTIME = round(mode_rate(GESTTIME), 3))
+```
+
+Дискретизация есть, будем иметь это в виду, когда нужно будет применять критерии,
+для которых важна непрерывность признаков.
+
+Посмотрим на данные.
+
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(GGally)
+```
+
+```{r, message=FALSE, warning=FALSE}
+df %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), 
+          columns = c("BODY_WEI", "BRAIN_WE", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN", "GESTTIME"))
+```
+
+Преобразуем данные. Логарифмируем данные, чтобы было легче наблюдать корреляции 
+(выше заметны сильно отличающиеся индивиды, это слоны) и получить нормальные 
+распределения признаков. Факторизуем индексы.
+```{r}
+dfNew <- df %>% 
+  mutate(PRED_IND = as.factor(PRED_IND), EXP_IND = as.factor(EXP_IND),
+         DANG_IND = as.factor(DANG_IND), 
+         BODY_WEI.log = log(BODY_WEI), BRAIN_WE.log = log(BRAIN_WE), 
+         LIFESPAN.log = log(LIFESPAN), GESTTIME.log = log(GESTTIME))
+```
+
+Посмотрим на новые данные.
+```{r, message=FALSE, warning=FALSE}
+dfNew %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), 
+          columns = c("BODY_WEI.log", "BRAIN_WE.log", "SLOWWAVE", "PARADOX", "SLEEP", "LIFESPAN.log", "GESTTIME.log"))
+```
+
+Используем описательные статистики для распределений признаков в новой выборке.
+```{r}
+library(moments)
+```
+
+```{r}
+characteristics <- function(x) {
+  c(mean = round(mean(x, na.rm = TRUE), 3),
+    median = round(median(x, na.rm = TRUE), 3),
+    var = round(var(x, na.rm = TRUE), 3),
+    skewness = round(skewness(x, na.rm = TRUE), 3),
+    kurtosis = round(kurtosis(x, na.rm = TRUE) - 3, 3))
+}
+
+data.frame(lapply(as.list(dfNew[2:8]), characteristics)) %>% t()
+```
+
+# Регрессионный анализ данных.
+1\. Для начала проверим корреляционную матрицу, чтобы убедится в том, что у нас нет
+линейно зависимых признаков.
+```{r}
+dfNew.num <- dfNew %>% 
+  mutate(PRED_IND = as.numeric(PRED_IND), EXP_IND = as.numeric(EXP_IND), 
+         DANG_IND = as.numeric(DANG_IND))
+
+cor(x=dfNew.num %>% dplyr::select(-NAME) %>%
+      mutate(SLOWWAVE_PARADOX=SLOWWAVE+PARADOX),
+    use="pairwise.complete.obs") 
+```
+
+Можно увидеть, что SLEEP линейно зависима с SLOWWAVE+PARADOX.
+Обрающаю внимание, что для использования lm.beta нужно сделать независимые 
+переменные независимыми. В нашем случаем нужно удалить SLEEP, SLOWWAVE или PARADOX 
+из модели. Так как в SLOWWAVE и PARADOX много пропусков, удалим их обоих.
+Так же многие методы, связанные с регрессией, требуют отстутствия пропусков в данных,
+поэтому удалим пропуски из выборки.
+```{r}
+dfNew.o.dum <- dfNew %>% dplyr::select(-SLOWWAVE, -PARADOX) %>% na.omit()
+dfNew.o.num <- dfNew.num %>% dplyr::select(-SLOWWAVE, -PARADOX) %>% na.omit()
+```
+
+Посмотрим сколько было индивидов в выборке до и после удаления.
+```{r}
+c(nrow(dfNew), nrow(dfNew.o.num))
+```
+
+Посмотрим кого удалили.
+```{r}
+dfNew[dfNew$NAME %in% dfNew.o.num$NAME == FALSE,]$NAME
+```
+
+Американский суслик, эфиопский ёж, генеты, броненосец, жираф, кенгуру, землекоп,
+горный бобр, окапи, крот, желтобрюхий сурок. Тут представлены довольно различне
+животные: большие, стредние, маленькие, тровоядные, хищные и т.д. Поэтому 
+нельзя сказать, что при удалении индивидов с пропусками мы удалили связанную 
+между собой группу или что пропуски отражают какую-то свзяь между индивидами, а 
+мы ее не будем далее рассматривать.
+
+Посмотрим на новые данные.
+```{r, message=FALSE}
+dfNew.o.num %>% dplyr::select(-NAME) %>%
+  ggpairs(diag=list(continuous = "barDiag"), 
+          columns = c("BODY_WEI.log", "BRAIN_WE.log", "SLEEP", "LIFESPAN.log", "GESTTIME.log"))
+```
+
+2,3\. Будем исследовать зависимость продолжительности жизни (зависимая переменная) от
+остальных признаков (независиммые переменные).
+
+Построим линейную регрессионную модель c dummy variables и без них и 
+вычислим стандартизированные коэффициенты. 
+```{r}
+library(lm.beta)
+
+model1.num = lm(LIFESPAN.log~BODY_WEI.log+BRAIN_WE.log+SLEEP+GESTTIME.log+PRED_IND+EXP_IND+DANG_IND, 
+                data=dfNew.o.num)
+model1.num.beta <- lm.beta(model1.num)
+summary(model1.num.beta)
+
+model1.dum = lm(LIFESPAN.log~BODY_WEI.log+BRAIN_WE.log+SLEEP+GESTTIME.log+PRED_IND+EXP_IND+DANG_IND, 
+                data=dfNew.o.dum)
+model1.dum.beta <- lm.beta(model1.dum)
+summary(model1.dum.beta)
+```
+Далее будем работать с данными без dummy variables так как модель без них
+более значима, p-value: 8.626e-11. Среди переменных значимы BRAIN_WE.log с 
+уровнем значимости 0.001, PRED_IND с уровнем значимости 0.05 и BODY_WEI.log, 
+DANG_IND с уровнем 0.1.
+
+7, 8\. Уберем в ручную избыточные переменные. Вычислим Tolerance.
+[R - множественный коэффициент корреляции между признаком и всеми остальными 
+независимыми признаками; Tolerance = 1 - R^2; VIF = 1 / (1 - R^2) = 1 / Tolerance.]
+
+```{r, message=FALSE}
+library(olsrr)
+ols_vif_tol(model1.num)
+```
+
+Меньшее значние Tolerance у DANG_IND.
+
+Вычислим частные производные.
+[Zero Order - корреляция Пирсона между зависимым и независимым признаком; 
+Partial - частная корреляци; Part - получастная корреляция.]
+```{r}
+ols_correlations(model1.num)
+```
+
+Меньшая частная корреляция у GESTTIME.log. Удалим из модели сначала GESTTIME.log, 
+так как он логично коррелирует с BODY_WEI.log и BRAIN_WE.log.
+```{r}
+model2.num = lm(LIFESPAN.log~BODY_WEI.log+BRAIN_WE.log+SLEEP+PRED_IND+EXP_IND+DANG_IND, 
+                data=dfNew.o.num)
+model2.num.beta <- lm.beta(model2.num)
+summary(model2.num.beta)
+```
+
+Модель значима. Удалим еще признак.
+```{r}
+ols_vif_tol(model2.num)
+```
+
+```{r}
+ols_correlations(model2.num)
+```
+
+Tolerance меньше всего у DANG_IND, а частная уорреляция меньше у SLEEP. 
+Удалим DANG_IND из модели, так как в моделе уже и так 3 индекса опасности.
+```{r}
+model3.num = lm(LIFESPAN.log~BODY_WEI.log+BRAIN_WE.log+SLEEP+PRED_IND+EXP_IND, 
+            data=dfNew.o.num)
+model3.num.beta <- lm.beta(model3.num)
+summary(model3.num.beta)
+```
+
+Модель значима. Удалим еще признак.
+```{r}
+ols_vif_tol(model3.num)
+```
+
+```{r}
+ols_correlations(model3.num)
+```
+
+У BRAIN_WE.log меньший Tolerance, но частная корреляция меньше всего у SLEEP.
+Удалим SLEEP из модели, так как по таблице выше этот признак не значим, в отличае 
+от BRAIN_WE.log.
+```{r}
+model4.num = lm(LIFESPAN.log~BODY_WEI.log+BRAIN_WE.log+PRED_IND+EXP_IND, 
+            data=dfNew.o.num)
+model4.num.beta <- lm.beta(model4.num)
+summary(model4.num.beta)
+```
+
+Модель стала еще более значима. Удалим еще признак.
+```{r}
+ols_vif_tol(model4.num)
+```
+
+```{r}
+ols_correlations(model4.num)
+```
+
+Tolerance наименьший у BODY_WEI.log и BODY_BRAIN.log. Частная корреляция меньшая 
+у BODY_WEI.log. Удалим BODY_WEI.log.
+```{r}
+model5.num = lm(LIFESPAN.log~BRAIN_WE.log+PRED_IND+EXP_IND, 
+            data=dfNew.o.num)
+model5.num.beta <- lm.beta(model5.num)
+summary(model5.num.beta)
+```
+
+Модель все еще значима. Удалим еще признак.
+```{r}
+ols_vif_tol(model5.num)
+```
+
+```{r}
+ols_correlations(model5.num)
+```
+
+Tolerance и частная корреляция меньше всего у EXP_IND. Удалим EXP_IND
+```{r}
+model5.num = lm(LIFESPAN.log~BRAIN_WE.log+PRED_IND, 
+            data=dfNew.o.num)
+model5.num.beta <- lm.beta(model5.num)
+summary(model5.num.beta)
+```
+
+Модель значима, в ней осталось 2 независимые переменных. Отановимся на этом.
+
+5\. На примере BRAIN_WE.log и PRED_IND построим доверительный эллипсоид между 
+коэффициентами модели. 
+```{r, message=FALSE}
+library(ellipse)
+plot(ellipse(model5.num, which = c(2, 3), level = 0.95), type="l") 
+```
+
+И тот же эллипсоид, но для стандартизированных коэффициентов.
+```{r}
+tmp <- dfNew.o.num %>% 
+  mutate(LIFESPAN.log = scale(LIFESPAN.log), BRAIN_WE.log = scale(BRAIN_WE.log), 
+         PRED_IND = scale(PRED_IND))
+model5.num.scale = lm(LIFESPAN.log~BRAIN_WE.log+PRED_IND, data=tmp)
+
+plot(ellipse(model5.num.scale, which = c(2, 3), level = 0.95), type="l") 
+```
+
+На эллипсоиде можно заметить, что корреляция между коэффициентами слабая и что 
+коэффициент при BRAIN_WE.log значим, так как его доверительная область далеко от
+нуля, а доверительная область коэффициента при PRED_IND захватывает 0.
+
+Вспомним, что PRED_IND можно представить как dummy variable. Возможно, зависимость
+между PRED_IND и LIFESPAN.log не линейная, и модель будет более значимая если представить 
+PRED_IND как dummy variables, чтобы разные его значения могли вносить вклад своими 
+коэффициентами. Посмотрим на зависимость LIFESPAN.log и PRED_IND.
+```{r}
+ggplot(dfNew.o.num, aes(x=PRED_IND, y=LIFESPAN.log)) + geom_point()
+```
+
+Между признаками есть нелинейная зависимость. Зависимость выглядит как парабола. 
+Давайте посмотрим, какая будет значимость у модели, если PRED_IND сделать dummy variables.
+```{r}
+model5.dum = lm(LIFESPAN.log~BRAIN_WE.log+PRED_IND, 
+            data=mutate(dfNew.o.num, PRED_IND=as.factor(PRED_IND)))
+model5.dum.beta <- lm.beta(model5.dum)
+summary(model5.dum.beta)
+```
+
+Ранее было p-value = 5.693e-12, так что улучшение есть, но незначительное. 
+
+9.\ Теперь попробуем использовать автоматическое удаление критериев.
+
+Проведем backward AIC для данных без и с dummy variables.
+```{r, message=FALSE}
+library(MASS)
+model1.num.AIC <- lm(LIFESPAN.log~BODY_WEI.log+BRAIN_WE.log+SLEEP+GESTTIME.log+PRED_IND+EXP_IND+DANG_IND, 
+                data=dfNew.o.num)
+stepAIC(model1.num.AIC, direction="backward")
+```
+```{r, message=FALSE}
+library(MASS)
+model1.dum.AIC <- lm(LIFESPAN.log~BODY_WEI.log+BRAIN_WE.log+SLEEP+GESTTIME.log+PRED_IND+EXP_IND+DANG_IND, 
+                data=dfNew.o.dum)
+stepAIC(model1.dum.AIC, direction="backward")
+```
+
+Проведем forward AIC для данных без и с dummy variables.
+```{r}
+model2.num.AIC <- lm(LIFESPAN.log~1, data=na.omit(dfNew.o.num))
+stepAIC(model2.num.AIC, direction="forward", scope=list(upper=model1.num.AIC,lower=model2.num.AIC))
+```
+
+```{r}
+model1.dum.AIC <- lm(LIFESPAN.log~1, data=na.omit(dfNew.o.dum))
+stepAIC(model1.dum.AIC, direction="forward", scope=list(upper=model1.dum.AIC,lower=model2.num.AIC))
+```
+
+forward AIC и backward AIC для данных с dummy variables выдают луший одинаковый 
+результат.
+
+Построим регрессионную модель на основе признаков, которые выбрал stepAIC.
+```{r}
+model.AIC <- lm(LIFESPAN.log ~ BRAIN_WE.log + PRED_IND + DANG_IND + SLEEP, 
+                data=dfNew.o.dum)
+model.AIC.beta <- lm.beta(model.AIC)
+summary(model.AIC.beta)
+```
+ 
+ Модель на порядок хуже той, что мы строили с BRAIN_WE.log и DANG_IND с dummy 
+ variables по p-value, так что дальше будем работать с нашей моделью а не моделью AIC.
+ 
+10\. Проверим нормальность остатков.
+```{r}
+shapiro.test(residuals(model5.dum.beta))
+```
+С уровнем значимости 0.05 гипотеза нормальности отвергается.
+
+Построим на Predicted vs Residuals plot.
+```{r, message=FALSE, warning=FALSE}
+library(olsrr)
+
+tmp <- data_frame(LIFESPAN=dfNew.o.dum$LIFESPAN, rstandard=rstandard(model5.dum))
+ggplot(tmp, aes(x=LIFESPAN, y=rstandard)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE)
+
+mean <- mean(tmp$rstandard)
+std <- sqrt(var(tmp$rstandard))
+
+ggplot(tmp, aes(x=LIFESPAN, y=rstandard)) +
+  geom_point() +
+  geom_hline(yintercept=mean, color = "red") +
+  geom_hline(yintercept=mean-std, color = "blue") +
+  geom_hline(yintercept=mean-2*std, color = "blue") +
+  geom_hline(yintercept=mean-3*std, color = "blue") +
+  geom_hline(yintercept=mean+std, color = "blue") +
+  geom_hline(yintercept=mean+2*std, color = "blue") +
+  geom_hline(yintercept=mean+3*std, color = "blue")
+```
+
+Есть один индивид за 3 сигмы от центра и два индивида за 2 сигмы, посмотрим кто это.
+```{r}
+dfNew.o.num[tmp$rstandard > mean+2*std | tmp$rstandard < mean-2*std,]$NAME
+```
+
+Большая летучая коричневая мышь, ехидна, маленькая летучая коричневая мышь.
+
+11\. Посмотрим на Residuals vs Deleted Residuals plot.
+Красная линия - это линия y=x, а синия линий - это линия регрессии.
+```{r, message=FALSE, warning=FALSE}
+df.rs <- data_frame(rstandard=rstandard(model5.dum), rstudent=rstudent(model5.dum))
+ggplot(df.rs, aes(x=rstandard, y=rstudent)) +
+  geom_point() +
+  geom_abline(slope=1, intercept=0, color='#E41A1C') +
+  geom_smooth(method=lm, se=FALSE)
+```
+
+Выбросов относительно регрессии нет.
+
+11\. Растояние Махаланобиса.
+```{r, message=FALSE, warning=FALSE}
+library(rstatix)
+mahal <- dfNew.o.num %>% 
+         dplyr::select(-NAME) %>%
+         mahalanobis_distance() %>%
+         mutate(index = 1:nrow(dfNew.o.num))
+
+ggplot(mahal) + geom_point(aes(x=reorder(index, -mahal.dist), y=mahal.dist)) +
+  ylab("mahalanobis distance") +
+  xlab("index")
+```
+
+Посмотрим на топ 4 индивида, они выбиваются из остальных.
+```{r}
+dfNew.o.num[c(1,4,28,22),]$NAME
+```
+
+Так и предполагалось, что слоны проявятся как выбросы при подсчете растояния 
+Махаланобиса.
+
+Растояние Кука.
+```{r, message=FALSE, warning=FALSE}
+cook <- dfNew.o.num %>% 
+  mutate(cooks.distance = cooks.distance(model5.dum), index = 1:nrow(dfNew.o.num))
+
+ggplot(cook) + geom_point(aes(x=reorder(index, -cooks.distance), y=cooks.distance)) +
+  ylab("cooks distance") +
+  xlab("index")
+```
+
+Посмотрим на топ 2 индивидов.
+```{r}
+dfNew.o.num[c(6,27),]$NAME
+```
+
+Проверим где на geopm_point находятся летучие мыши и логично ли, что они 
+проявились как выбросы по растоянию Кука.
+```{r, message=FALSE}
+ggplot(dfNew.o.num, aes(x=BRAIN_WE.log, y=LIFESPAN.log, label=1:nrow(dfNew.o.num)))+
+  geom_point() +
+  geom_text(hjust=-0.1, vjust=-0.1) +
+  geom_smooth(method=lm, se=FALSE)
+```
+
+Действительно, так и есть. 6 и 27 это мыши и они выбросы относительно линии регрессии.
+
+# Предсказание продолжительности жизни капибар.
+На деле капибары живут 8-10 лет на воле и 10-12 в неволе. У капибар не много
+врагов в природе, но и на вершину пищевой цепи их не поставить, пусть PRED_IND
+будет равен 3. Средний вес мозга у капибары 76 грамм.
+
+```{r}
+new <- data_frame(BRAIN_WE.log=c(log(76)), PRED_IND=c(3)) %>% mutate(PRED_IND = as.factor(PRED_IND))
+exp(predict.lm(model5.dum, new, interval = "prediction"))
+```
+
+Удалось предсказать время жизни капибры по весу мозга и предположению о ее 
+индексе опасности.
